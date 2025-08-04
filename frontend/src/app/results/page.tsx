@@ -1,11 +1,14 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAccount } from 'wagmi';
+import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Download, CheckCircle, 
   BarChart3, Shield, Database, 
   FileText, AlertTriangle, Zap, Eye, Hash, ExternalLink, Share2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface AnalysisResult {
   qualityScore: number;
@@ -23,6 +26,26 @@ interface AnalysisResult {
 
 const ResultsPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Wallet connection check
+  const { isConnected } = useAccount();
+  const router = useRouter();
+
+  // Check wallet connection on mount
+  useEffect(() => {
+    if (!isConnected) {
+      toast.error('Please connect your wallet to use this feature', {
+        duration: 4000,
+        icon: '🔒',
+      });
+      router.push('/');
+    }
+  }, [isConnected, router]);
+
+  // Don't render if wallet is not connected
+  if (!isConnected) {
+    return null;
+  }
 
   // Mock analysis results - in real app, this would come from API
   const results: AnalysisResult = {
@@ -65,7 +88,7 @@ const ResultsPage = () => {
             <span>Back to Home</span>
           </Link>
         </div>
-
+        
         {/* Header */}
         <div className="text-center mb-12">
           <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -87,7 +110,6 @@ const ResultsPage = () => {
               <div className={`p-3 rounded-xl ${getQualityBg(results.qualityScore)}`}>
                 <BarChart3 className={`w-6 h-6 ${getQualityColor(results.qualityScore)}`} />
               </div>
-              {/* TrendingUp className="w-5 h-5 text-green-600" /> */}
             </div>
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {results.qualityScore}%
@@ -100,7 +122,6 @@ const ResultsPage = () => {
               <div className="p-3 rounded-xl bg-red-100 dark:bg-red-900/30">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
-              {/* TrendingDown className="w-5 h-5 text-red-600" /> */}
             </div>
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {results.anomalies}
@@ -113,7 +134,6 @@ const ResultsPage = () => {
               <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30">
                 <Shield className="w-6 h-6 text-blue-600" />
               </div>
-              {/* TrendingUp className="w-5 h-5 text-blue-600" /> */}
             </div>
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {results.biasScore}%
@@ -126,7 +146,6 @@ const ResultsPage = () => {
               <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30">
                 <Zap className="w-6 h-6 text-purple-600" />
               </div>
-              {/* Clock className="w-5 h-5 text-purple-600" /> */}
             </div>
             <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {results.processingTime}
@@ -183,7 +202,7 @@ const ResultsPage = () => {
                           </span>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <span className="font-medium text-gray-900 dark:text-white">Completeness</span>
                         <span className="font-bold text-green-600">{results.completeness}%</span>
@@ -430,4 +449,4 @@ const ResultsPage = () => {
   );
 };
 
-export default ResultsPage;
+export default ResultsPage; 

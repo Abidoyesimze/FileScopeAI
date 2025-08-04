@@ -1,11 +1,14 @@
 'use client'
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { 
   Upload, FileText, Database, CheckCircle, AlertCircle, 
   X, ArrowRight, BarChart3, Shield, Zap, 
   FileSpreadsheet, Code, Info, Loader,
   Target, Award, Bell, Download, Copy, Verified, ArrowLeft, AlertTriangle
 } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 interface FilePreview {
   headers: string[];
@@ -88,8 +91,48 @@ const FileScopeApp = () => {
   // Results states  
   const [copiedHash, setCopiedHash] = useState(false);
 
-  // Mock comprehensive analysis results
-  const mockAnalysisResults: AnalysisResult = {
+  // Wallet connection check
+  const { isConnected } = useAccount();
+  const router = useRouter();
+
+  // Check wallet connection on mount
+  useEffect(() => {
+    if (!isConnected) {
+      toast.error('Please connect your wallet to use this feature', {
+        duration: 4000,
+        icon: '🔒',
+      });
+      router.push('/');
+    }
+  }, [isConnected, router]);
+
+  // Supported file types - moved to top level
+  const supportedTypes: Record<string, SupportedType> = useMemo(() => ({
+    'text/csv': { icon: FileSpreadsheet, label: 'CSV', color: 'green' },
+    'application/json': { icon: Code, label: 'JSON', color: 'blue' },
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { icon: FileText, label: 'XLSX', color: 'orange' }
+  }), []);
+
+  // Sample datasets - moved to top level
+  const sampleDatasets: SampleDataset[] = useMemo(() => [
+    {
+      name: "Election Polling Data 2024",
+      size: "2.3 MB",
+      rows: "15,420",
+      description: "Comprehensive polling data from multiple sources",
+      type: "CSV"
+    },
+    {
+      name: "Climate Temperature Records",
+      size: "8.7 MB", 
+      rows: "89,432",
+      description: "Global temperature data over the past 50 years",
+      type: "JSON"
+    }
+  ], []);
+
+  // Mock comprehensive analysis results - moved to top level
+  const mockAnalysisResults: AnalysisResult = useMemo(() => ({
     metadata: {
       fileName: "election_polling_data_2024.csv",
       uploadDate: "2024-08-04T10:30:00Z",
@@ -151,66 +194,68 @@ const FileScopeApp = () => {
         action: "Dataset ready for most analytical use cases"
       }
     ]
-  };
-
-  // Supported file types
-  const supportedTypes: Record<string, SupportedType> = useMemo(() => ({
-    'text/csv': { icon: FileSpreadsheet, label: 'CSV', color: 'green' },
-    'application/json': { icon: Code, label: 'JSON', color: 'blue' },
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { icon: FileText, label: 'XLSX', color: 'orange' }
   }), []);
 
-  // Sample datasets
-  const sampleDatasets: SampleDataset[] = [
-    {
-      name: "Election Polling Data 2024",
-      size: "2.3 MB",
-      rows: "15,420",
-      description: "Comprehensive polling data from multiple sources",
-      type: "CSV"
-    },
-    {
-      name: "Climate Temperature Records",
-      size: "8.7 MB", 
-      rows: "89,432",
-      description: "Global temperature data over the past 50 years",
-      type: "JSON"
-    }
-  ];
-
-  // Navigation Functions
-  const navigateToStep = (step: 'upload' | 'preview' | 'processing' | 'results') => {
+  // Navigation Functions - moved before early return
+  const navigateToStep = useCallback((step: 'upload' | 'preview' | 'processing' | 'results') => {
     setCurrentStep(step);
     if (step === 'upload') {
       resetUpload();
     }
-  };
+  }, []);
 
-  const resetUpload = () => {
+  const resetUpload = useCallback(() => {
     setUploadedFile(null);
     setFilePreview(null);
     setError(null);
     setAnalysisResults(null);
-  };
+  }, []);
 
-  // File Upload Functions
+  // File Upload Functions - moved before early return
+  const generatePreview = useCallback((file: File) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      let preview: FilePreview = { headers: [], sampleRows: [], totalLines: 0 };
+      
+      if (file.type === 'text/csv') {
+        const lines = content.split('\n');
+        preview = {
+          headers: lines[0] ? lines[0].split(',').map((h: string) => h.trim()) : [],
+          sampleRows: lines.slice(1, 6).map((row: string) => row.split(',')),
+          totalLines: lines.length - 1
+        };
+      }
+      
+      setFilePreview(preview);
+    };
+    
+    reader.readAsText(file);
+  }, []);
+
   const handleFileUpload = useCallback((file: File) => {
     setError(null);
     
     if (!supportedTypes[file.type]) {
-      setError(`Unsupported file type: ${file.type}. Please upload CSV, JSON, or Excel files.`);
+      const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, or Excel files.`;
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
-      setError('File size too large. Please upload files smaller than 100MB.');
+      const errorMsg = 'File size too large. Please upload files smaller than 100MB.';
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
     setUploadedFile(file);
     generatePreview(file);
     setCurrentStep('preview');
-  }, [supportedTypes]);
+    toast.success('File uploaded successfully! Review your data below.');
+  }, [supportedTypes, generatePreview]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -232,7 +277,7 @@ const FileScopeApp = () => {
     }
   }, [handleFileUpload]);
 
-  const handleSampleDataset = (dataset: SampleDataset) => {
+  const handleSampleDataset = useCallback((dataset: SampleDataset) => {
     // Mock file object for sample dataset
     const mockFile = new File(
       [new Blob(['mock data'])], 
@@ -254,39 +299,21 @@ const FileScopeApp = () => {
     });
     
     setCurrentStep('preview');
-  };
+    toast.success(`Using sample dataset: ${dataset.name}`);
+  }, []);
 
-  const generatePreview = (file: File) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      let preview: FilePreview = { headers: [], sampleRows: [], totalLines: 0 };
-      
-      if (file.type === 'text/csv') {
-        const lines = content.split('\n');
-        preview = {
-          headers: lines[0] ? lines[0].split(',').map((h: string) => h.trim()) : [],
-          sampleRows: lines.slice(1, 6).map((row: string) => row.split(',')),
-          totalLines: lines.length - 1
-        };
-      }
-      
-      setFilePreview(preview);
-    };
-    
-    reader.readAsText(file);
-  };
-
-  const startAnalysis = () => {
+  const startAnalysis = useCallback(() => {
     setCurrentStep('processing');
+    
+    toast.loading('Starting AI analysis...', { id: 'analysis' });
     
     // Simulate AI processing
     setTimeout(() => {
       setAnalysisResults(mockAnalysisResults);
       setCurrentStep('results'); // Navigate to results!
+      toast.success('Analysis completed successfully!', { id: 'analysis' });
     }, 3000);
-  };
+  }, [mockAnalysisResults]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -296,38 +323,10 @@ const FileScopeApp = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Helper functions for results
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-green-600 bg-green-50 border-green-200';
-    if (score >= 70) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    return 'text-red-600 bg-red-50 border-red-200';
-  };
-
-  const getInsightIcon = (type: string) => {
-    const icons: Record<string, React.ComponentType<{ className?: string }>> = { 
-      critical: AlertTriangle, 
-      warning: Bell, 
-      success: CheckCircle, 
-      info: Info 
-    };
-    return icons[type];
-  };
-
-  const getInsightColor = (type: string) => {
-    const colors: Record<string, string> = {
-      critical: 'text-red-600 bg-red-50 border-red-200',
-      warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-      success: 'text-green-600 bg-green-50 border-green-200',
-      info: 'text-blue-600 bg-blue-50 border-blue-200'
-    };
-    return colors[type];
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedHash(true);
-    setTimeout(() => setCopiedHash(false), 2000);
-  };
+  // Don't render if wallet is not connected - moved after all hooks
+  if (!isConnected) {
+    return null;
+  }
 
   // Render different steps based on current state
   const renderContent = () => {
@@ -799,6 +798,40 @@ const FileScopeApp = () => {
         </div>
       </div>
     );
+  };
+
+  // Helper functions for results
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return 'text-green-600 bg-green-50 border-green-200';
+    if (score >= 70) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    return 'text-red-600 bg-red-50 border-red-200';
+  };
+
+  const getInsightIcon = (type: string) => {
+    const icons: Record<string, React.ComponentType<{ className?: string }>> = { 
+      critical: AlertTriangle, 
+      warning: Bell, 
+      success: CheckCircle, 
+      info: Info 
+    };
+    return icons[type];
+  };
+
+  const getInsightColor = (type: string) => {
+    const colors: Record<string, string> = {
+      critical: 'text-red-600 bg-red-50 border-red-200',
+      warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+      success: 'text-green-600 bg-green-50 border-green-200',
+      info: 'text-blue-600 bg-blue-50 border-blue-200'
+    };
+    return colors[type];
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedHash(true);
+    toast.success('Hash copied to clipboard!');
+    setTimeout(() => setCopiedHash(false), 2000);
   };
 
   return (
