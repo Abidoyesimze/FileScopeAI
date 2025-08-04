@@ -1,13 +1,19 @@
 'use client'
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Database, Menu, X, Sun, Moon, Globe } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useAccount } from 'wagmi';
+import { useRouter } from 'next/navigation';
+import { Sun, Moon, Menu, X, Database } from 'lucide-react';
+import { ConnectWallet } from '../../components/ConnectWallet';
+import toast from 'react-hot-toast';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { isConnected } = useAccount();
+  const router = useRouter();
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -18,118 +24,93 @@ const Navigation = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
-  if (!mounted) {
-    return (
-      <nav className="bg-white/95 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Database className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                FileScope AI
-              </span>
-            </div>
-            
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">Features</a>
-              <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">How it Works</a>
-              <a href="#use-cases" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">Use Cases</a>
-              
-              <div className="p-2 rounded-lg bg-gray-100 w-9 h-9"></div>
-              
-              <button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg font-medium">
-                Connect Wallet
-              </button>
-            </div>
-
-            <div className="md:hidden flex items-center space-x-2">
-              <div className="p-2 rounded-lg bg-gray-100 w-9 h-9"></div>
-              <Menu className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-      </nav>
-    );
-  }
+  const handleProtectedNavigation = (path: string, actionName: string) => {
+    if (!isConnected) {
+      toast.error(`Please connect your wallet first to ${actionName}`, {
+        duration: 4000,
+        icon: '🔒',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+        },
+      });
+      return;
+    }
+    router.push(path);
+  };
 
   return (
-    <nav className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-800 sticky top-0 z-50">
+    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
               <Database className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
-              FileScope AI
-            </span>
-          </div>
-          
-          {/* Desktop Menu */}
+            <span className="text-xl font-bold text-gray-900 dark:text-white">FileScope AI</span>
+          </Link>
+
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors font-medium">Features</a>
-            <a href="#how-it-works" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors font-medium">How it Works</a>
-            <a href="#use-cases" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors font-medium">Use Cases</a>
-            <Link href="/explorer" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors font-medium flex items-center space-x-1">
-              <Globe className="w-4 h-4" />
-              <span>Explore Datasets</span>
-            </Link>
-            
+            <button 
+              onClick={() => handleProtectedNavigation('/upload', 'upload datasets')}
+              className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Upload Dataset
+            </button>
+            <button 
+              onClick={() => handleProtectedNavigation('/explorer', 'explore datasets')}
+              className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              Explore Datasets
+            </button>
+          </div>
+
+          {/* Right side - Theme toggle and Connect Wallet */}
+          <div className="flex items-center space-x-4">
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Toggle theme"
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
-              {theme === 'dark' ? (
-                <Sun className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-              ) : (
-                <Moon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-              )}
+              {mounted && theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            
-            <button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg font-medium">
-              Connect Wallet
-            </button>
-          </div>
 
-          {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center space-x-2">
+            {/* Connect Wallet */}
+            <ConnectWallet />
+
+            {/* Mobile menu button */}
             <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-              ) : (
-                <Moon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-              )}
-            </button>
-            
-            <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="md:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-gray-100 dark:border-gray-800">
+          <div className="md:hidden py-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex flex-col space-y-4">
-              <a href="#features" className="text-gray-600 dark:text-gray-300 font-medium">Features</a>
-              <a href="#how-it-works" className="text-gray-600 dark:text-gray-300 font-medium">How it Works</a>
-              <a href="#use-cases" className="text-gray-600 dark:text-gray-300 font-medium">Use Cases</a>
-              <Link href="/explorer" className="text-gray-600 dark:text-gray-300 font-medium flex items-center space-x-2">
-                <Globe className="w-4 h-4" />
-                <span>Explore Datasets</span>
-              </Link>
-              <button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium w-full">
-                Connect Wallet
+              <button 
+                onClick={() => {
+                  handleProtectedNavigation('/upload', 'upload datasets');
+                  setIsMenuOpen(false);
+                }}
+                className="text-left text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
+              >
+                Upload Dataset
+              </button>
+              <button 
+                onClick={() => {
+                  handleProtectedNavigation('/explorer', 'explore datasets');
+                  setIsMenuOpen(false);
+                }}
+                className="text-left text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
+              >
+                Explore Datasets
               </button>
             </div>
           </div>

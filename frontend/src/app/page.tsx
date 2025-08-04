@@ -1,14 +1,18 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import { 
   Database, Upload, Shield, CheckCircle, 
   Users, FileText, Zap, Brain, Eye,
   ArrowRight, Play, Building
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const FileScope = () => {
   const [activeFeature, setActiveFeature] = useState(0);
+  const { isConnected } = useAccount();
+  const router = useRouter();
 
   // Auto-rotate features demo
   useEffect(() => {
@@ -17,6 +21,38 @@ const FileScope = () => {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleUploadClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isConnected) {
+      toast.error('Please connect your wallet first to upload datasets', {
+        duration: 4000,
+        icon: '🔒',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+        },
+      });
+      return;
+    }
+    router.push('/upload');
+  };
+
+  const handleExplorerClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isConnected) {
+      toast.error('Please connect your wallet first to explore datasets', {
+        duration: 4000,
+        icon: '🔒',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+        },
+      });
+      return;
+    }
+    router.push('/explorer');
+  };
 
   const features = [
     {
@@ -91,19 +127,21 @@ const FileScope = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 mb-16">
-              <Link href="/upload">
-                <button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1 flex items-center space-x-2">
-                  <Upload className="w-5 h-5" />
-                  <span>Analyze Your Dataset</span>
-                </button>
-              </Link>
+              <button 
+                onClick={handleUploadClick}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-1 flex items-center space-x-2"
+              >
+                <Upload className="w-5 h-5" />
+                <span>Analyze Your Dataset</span>
+              </button>
               
-              <Link href="/upload">
-                <button className="border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-8 py-4 rounded-xl font-semibold text-lg hover:border-gray-400 dark:hover:border-gray-500 transition-all flex items-center space-x-2">
-                  <Play className="w-5 h-5" />
-                  <span>Launch App</span>
-                </button>
-              </Link>
+              <button 
+                onClick={handleUploadClick}
+                className="border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-8 py-4 rounded-xl font-semibold text-lg hover:border-gray-400 dark:hover:border-gray-500 transition-all flex items-center space-x-2"
+              >
+                <Play className="w-5 h-5" />
+                <span>Launch App</span>
+              </button>
             </div>
 
             {/* Stats */}
@@ -260,11 +298,12 @@ const FileScope = () => {
           </div>
 
           <div className="text-center mt-16">
-            <Link href="/upload">
-              <button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg">
-                Try It Now - It&apos;s Free
-              </button>
-            </Link>
+            <button 
+              onClick={handleUploadClick}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
+            >
+              Try It Now - It&apos;s Free
+            </button>
           </div>
         </div>
       </section>
@@ -311,15 +350,19 @@ const FileScope = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <Link href="/upload">
-              <button className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-all shadow-lg flex items-center space-x-2">
-                <Upload className="w-5 h-5" />
-                <span>Start Analyzing Now</span>
-              </button>
-            </Link>
+            <button 
+              onClick={handleUploadClick}
+              className="bg-white text-blue-600 px-8 py-4 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-all shadow-lg flex items-center space-x-2"
+            >
+              <Upload className="w-5 h-5" />
+              <span>Start Analyzing Now</span>
+            </button>
             
-            <button className="border-2 border-white text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white hover:text-blue-600 transition-all flex items-center space-x-2">
-              <span>View Sample Analysis</span>
+            <button 
+              onClick={handleExplorerClick}
+              className="border-2 border-white text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-white hover:text-blue-600 transition-all flex items-center space-x-2"
+            >
+              <span>Explore Datasets</span>
               <ArrowRight className="w-5 h-5" />
             </button>
           </div>
