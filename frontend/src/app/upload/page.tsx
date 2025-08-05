@@ -4,7 +4,7 @@ import {
   Upload, FileText, Database, CheckCircle, AlertCircle, 
   X, ArrowRight, BarChart3, Shield, Zap, 
   FileSpreadsheet, Code, Info, Loader,
-  Target, Award, Bell, Download, Copy, Verified, ArrowLeft, AlertTriangle
+  Target, Award, Bell, Download, Copy, Verified, ArrowLeft, AlertTriangle, Eye
 } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { useRouter } from 'next/navigation';
@@ -41,6 +41,7 @@ interface AnalysisResult {
     ipfsHash: string;
     contractAddress: string;
     blockNumber: string;
+    isPublic: boolean; // Added isPublic to metadata
   };
   qualityScore: {
     overall: number;
@@ -88,23 +89,35 @@ const FileScopeApp = () => {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Lighthouse/IPFS states
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [ipfsHash, setIpfsHash] = useState<string>('');
+  
   // Results states  
   const [copiedHash, setCopiedHash] = useState(false);
+  const [isPublic, setIsPublic] = useState(false); // Added isPublic state
 
   // Wallet connection check
   const { isConnected } = useAccount();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Set mounted state after component mounts
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check wallet connection on mount
   useEffect(() => {
-    if (!isConnected) {
+    if (mounted && !isConnected) {
       toast.error('Please connect your wallet to use this feature', {
         duration: 4000,
         icon: '🔒',
       });
       router.push('/');
     }
-  }, [isConnected, router]);
+  }, [isConnected, router, mounted]);
 
   // Supported file types - moved to top level
   const supportedTypes: Record<string, SupportedType> = useMemo(() => ({
@@ -142,7 +155,8 @@ const FileScopeApp = () => {
       processingTime: "2.3 minutes",
       ipfsHash: "QmYwAPJzv5CZsnA8rdHaSmTRBPVLHHN5wYJsf9tR6ZGBQs",
       contractAddress: "0x742d35cc6639c0532...9877",
-      blockNumber: "2,341,567"
+      blockNumber: "2,341,567",
+      isPublic: false // Mocking a private dataset
     },
     qualityScore: {
       overall: 87,
@@ -209,6 +223,61 @@ const FileScopeApp = () => {
     setFilePreview(null);
     setError(null);
     setAnalysisResults(null);
+    setIsUploading(false);
+    setUploadProgress(0);
+    setIpfsHash('');
+    setIsPublic(false); // Reset visibility
+  }, []);
+
+  // Pinata IPFS Upload Function
+  const uploadToPinata = useCallback(async (file: File): Promise<string> => {
+    const pinataApiKey = process.env.NEXT_PUBLIC_PINATA_API_KEY;
+    const pinataSecretApiKey = process.env.NEXT_PUBLIC_PINATA_SECRET_API_KEY;
+    
+    if (!pinataApiKey || !pinataSecretApiKey) {
+      throw new Error('Pinata API keys not found. Please add NEXT_PUBLIC_PINATA_API_KEY and NEXT_PUBLIC_PINATA_SECRET_API_KEY to your environment variables.');
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      // Upload to Pinata using REST API
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+        method: 'POST',
+        headers: {
+          'pinata_api_key': pinataApiKey,
+          'pinata_secret_api_key': pinataSecretApiKey,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Pinata upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const cid = result.IpfsHash;
+      setIpfsHash(cid);
+      setUploadProgress(100);
+      
+      toast.success(`File uploaded to IPFS: ${cid.substring(0, 10)}...`);
+      return cid;
+      
+    } catch (error) {
+      console.error('Pinata upload error:', error);
+      
+      if (error instanceof Error && error.message && error.message.includes('Trial expired')) {
+        throw new Error('Pinata API trial expired. Please contact support for a valid API key.');
+      }
+      
+      throw new Error('Failed to upload to IPFS. Please check your API keys and try again.');
+    } finally {
+      setIsUploading(false);
+    }
   }, []);
 
   // File Upload Functions - moved before early return
@@ -278,9 +347,17 @@ const FileScopeApp = () => {
   }, [handleFileUpload]);
 
   const handleSampleDataset = useCallback((dataset: SampleDataset) => {
-    // Mock file object for sample dataset
+    // Create a more realistic mock file for sample dataset
+    const csvContent = `poll_date,candidate,party,percentage,sample_size,location
+2024-07-15,John Smith,Democratic,42.3,1200,California
+2024-07-15,Jane Doe,Republican,38.7,1200,California
+2024-07-16,John Smith,Democratic,41.8,950,Texas
+2024-07-16,Jane Doe,Republican,39.2,950,Texas
+2024-07-17,John Smith,Democratic,43.1,1100,New York
+2024-07-17,Jane Doe,Republican,37.9,1100,New York`;
+    
     const mockFile = new File(
-      [new Blob(['mock data'])], 
+      [csvContent], 
       dataset.name.toLowerCase().replace(/\s+/g, '_') + '.csv',
       { type: 'text/csv' }
     );
@@ -302,18 +379,52 @@ const FileScopeApp = () => {
     toast.success(`Using sample dataset: ${dataset.name}`);
   }, []);
 
-  const startAnalysis = useCallback(() => {
+  // Updated startAnalysis with real IPFS upload
+  const startAnalysis = useCallback(async () => {
+    if (!uploadedFile) {
+      toast.error('No file selected');
+      return;
+    }
+
     setCurrentStep('processing');
     
-    toast.loading('Starting AI analysis...', { id: 'analysis' });
-    
-    // Simulate AI processing
-    setTimeout(() => {
-      setAnalysisResults(mockAnalysisResults);
-      setCurrentStep('results'); // Navigate to results!
-      toast.success('Analysis completed successfully!', { id: 'analysis' });
-    }, 3000);
-  }, [mockAnalysisResults]);
+    try {
+      // Step 1: Upload to IPFS via Pinata
+      toast.loading('Uploading to IPFS...', { id: 'analysis' });
+      const cid = await uploadToPinata(uploadedFile);
+      
+      // Step 2: Simulate AI Analysis (replace with real AI call later)
+      toast.loading('Running AI analysis...', { id: 'analysis' });
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Step 3: Create results with real IPFS hash
+      const resultsWithRealCID = {
+        ...mockAnalysisResults,
+        metadata: {
+          ...mockAnalysisResults.metadata,
+          fileName: uploadedFile.name,
+          fileSize: formatFileSize(uploadedFile.size),
+          ipfsHash: cid, // Real IPFS hash from Pinata!
+          uploadDate: new Date().toISOString(),
+          isPublic: isPublic // Include visibility
+        }
+      };
+      
+      setAnalysisResults(resultsWithRealCID);
+      setCurrentStep('results');
+      
+      // Show success message with visibility status
+      const visibilityMsg = isPublic 
+        ? 'Analysis completed and made public! 🌐' 
+        : 'Analysis completed and kept private! 🔒';
+      toast.success(visibilityMsg, { id: 'analysis' });
+      
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      toast.error('Analysis failed. Please try again.', { id: 'analysis' });
+      setCurrentStep('preview'); // Go back to preview on error
+    }
+  }, [uploadedFile, mockAnalysisResults, uploadToPinata, isPublic]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -324,8 +435,20 @@ const FileScopeApp = () => {
   };
 
   // Don't render if wallet is not connected - moved after all hooks
-  if (!isConnected) {
-    return null;
+  if (!mounted || !isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/20 py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Database className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Loading...</h1>
+            <p className="text-gray-600 dark:text-gray-300">Please wait while we check your wallet connection.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Render different steps based on current state
@@ -354,38 +477,98 @@ const FileScopeApp = () => {
               </div>
 
               <div className="space-y-4 mb-8">
-                <div className="flex items-center space-x-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                {/* IPFS Upload Status - Updated with real progress */}
+                <div className={`flex items-center space-x-4 p-4 rounded-lg border ${
+                  ipfsHash 
+                    ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800' 
+                    : isUploading 
+                      ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' 
+                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                }`}>
+                  {ipfsHash ? (
+                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                  ) : isUploading ? (
+                    <Loader className="w-6 h-6 text-blue-600 flex-shrink-0 animate-spin" />
+                  ) : (
+                    <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex-shrink-0"></div>
+                  )}
                   <div className="flex-1">
-                    <div className="font-medium text-green-900">Data Upload Complete</div>
-                    <div className="text-sm text-green-700">File successfully stored on IPFS</div>
+                    <div className={`font-medium ${
+                      ipfsHash ? 'text-green-900 dark:text-green-100' : isUploading ? 'text-blue-900 dark:text-blue-100' : 'text-gray-600 dark:text-gray-300'
+                    }`}>
+                      {ipfsHash ? 'IPFS Upload Complete' : isUploading ? 'Uploading to IPFS...' : 'Preparing Upload'}
+                    </div>
+                    <div className={`text-sm ${
+                      ipfsHash ? 'text-green-700 dark:text-green-300' : isUploading ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {ipfsHash 
+                        ? `Stored at: ${ipfsHash.substring(0, 20)}...`
+                        : isUploading
+                          ? `${uploadProgress}% uploaded`
+                          : 'File will be stored on IPFS'
+                      }
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Loader className="w-6 h-6 text-blue-600 flex-shrink-0 animate-spin" />
+                <div className={`flex items-center space-x-4 p-4 rounded-lg border ${
+                  ipfsHash ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                }`}>
+                  {ipfsHash ? (
+                    <Loader className="w-6 h-6 text-blue-600 flex-shrink-0 animate-spin" />
+                  ) : (
+                    <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex-shrink-0"></div>
+                  )}
                   <div className="flex-1">
-                    <div className="font-medium text-blue-900">Running AI Analysis</div>
-                    <div className="text-sm text-blue-700">Detecting anomalies, bias, and quality issues...</div>
+                    <div className={`font-medium ${ipfsHash ? 'text-blue-900 dark:text-blue-100' : 'text-gray-600 dark:text-gray-300'}`}>
+                      {ipfsHash ? 'Running AI Analysis' : 'AI Analysis Pending'}
+                    </div>
+                    <div className={`text-sm ${ipfsHash ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {ipfsHash ? 'Detecting anomalies, bias, and quality issues...' : 'Waiting for file upload to complete'}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="w-6 h-6 border-2 border-gray-300 rounded-full flex-shrink-0"></div>
+                <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex-shrink-0"></div>
                   <div className="flex-1">
-                    <div className="font-medium text-gray-600">Generating Visualizations</div>
-                    <div className="text-sm text-gray-500">Creating charts and summary reports</div>
+                    <div className="font-medium text-gray-600 dark:text-gray-300">Generating Visualizations</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Creating charts and summary reports</div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="w-6 h-6 border-2 border-gray-300 rounded-full flex-shrink-0"></div>
+                <div className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                  <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 rounded-full flex-shrink-0"></div>
                   <div className="flex-1">
-                    <div className="font-medium text-gray-600">Blockchain Verification</div>
-                    <div className="text-sm text-gray-500">Storing results on Filecoin with smart contract</div>
+                    <div className="font-medium text-gray-600 dark:text-gray-300">Blockchain Verification</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Storing results on Filecoin with smart contract</div>
                   </div>
                 </div>
               </div>
+
+              {/* Real-time file info */}
+              {uploadedFile && (
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{formatFileSize(uploadedFile.size)}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">File Size</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{filePreview?.totalLines?.toLocaleString() || '0'}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Rows</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{filePreview?.headers?.length || '0'}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Columns</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{supportedTypes[uploadedFile.type]?.label || 'Unknown'}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Format</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -416,9 +599,23 @@ const FileScopeApp = () => {
                 </div>
                 
                 <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
                     <Verified className="w-5 h-5 text-green-600" />
                     <span>Blockchain Verified</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
+                    {analysisResults.metadata.isPublic ? (
+                      <>
+                        <Eye className="w-5 h-5 text-blue-600" />
+                        <span>Public Dataset</span>
+                      </>
+                    ) : (
+                      <>
+                        <Shield className="w-5 h-5 text-gray-600" />
+                        <span>Private Dataset</span>
+                      </>
+                    )}
                   </div>
                   
                   <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
@@ -434,62 +631,62 @@ const FileScopeApp = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                     <Award className="w-6 h-6 text-blue-600" />
                   </div>
                   <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getScoreColor(analysisResults.qualityScore.overall)}`}>
                     {analysisResults.qualityScore.overall}%
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Quality Score</h3>
-                <p className="text-gray-600 text-sm">Overall dataset quality</p>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Quality Score</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Overall dataset quality</p>
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-red-50 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
                     <AlertTriangle className="w-6 h-6 text-red-600" />
                   </div>
-                  <div className="px-3 py-1 rounded-full text-sm font-medium bg-red-50 text-red-600 border border-red-200">
+                  <div className="px-3 py-1 rounded-full text-sm font-medium bg-red-50 dark:bg-red-900/30 text-red-600 border border-red-200 dark:border-red-800">
                     {analysisResults.anomalies.total}
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Anomalies</h3>
-                <p className="text-gray-600 text-sm">{analysisResults.anomalies.high} require attention</p>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Anomalies</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">{analysisResults.anomalies.high} require attention</p>
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-purple-50 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
                     <Target className="w-6 h-6 text-purple-600" />
                   </div>
                   <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getScoreColor(Math.round((1 - analysisResults.biasMetrics.overall) * 100))}`}>
                     {Math.round((1 - analysisResults.biasMetrics.overall) * 100)}%
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Bias Score</h3>
-                <p className="text-gray-600 text-sm">Lower is better</p>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Bias Score</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">Lower is better</p>
               </div>
 
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-green-50 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
                     <Database className="w-6 h-6 text-green-600" />
                   </div>
-                  <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-50 text-green-600 border border-green-200">
+                  <div className="px-3 py-1 rounded-full text-sm font-medium bg-green-50 dark:bg-green-900/30 text-green-600 border border-green-200 dark:border-green-800">
                     {analysisResults.metadata.rows.toLocaleString()}
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">Dataset Size</h3>
-                <p className="text-gray-600 text-sm">{analysisResults.metadata.columns} columns</p>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Dataset Size</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">{analysisResults.metadata.columns} columns</p>
               </div>
             </div>
 
             {/* Key Insights */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Key Insights</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Key Insights</h3>
               <div className="grid gap-4">
                 {analysisResults.insights.map((insight, index) => {
                   const Icon = getInsightIcon(insight.type);
@@ -510,43 +707,55 @@ const FileScopeApp = () => {
             </div>
 
             {/* Blockchain Verification */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Blockchain Verification</h3>
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200 mb-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Blockchain Verification</h3>
+              <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-green-800 mb-6">
                 <div className="flex items-center space-x-3">
                   <CheckCircle className="w-6 h-6 text-green-600" />
                   <div>
-                    <h4 className="font-semibold text-green-900">Analysis Verified</h4>
-                    <p className="text-green-700 text-sm">Permanently stored on Filecoin with cryptographic proof</p>
+                    <h4 className="font-semibold text-green-900 dark:text-green-100">Analysis Verified</h4>
+                    <p className="text-green-700 dark:text-green-300 text-sm">Permanently stored on Filecoin with cryptographic proof</p>
                   </div>
                 </div>
               </div>
               
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-900 mb-3">IPFS Hash</h4>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">IPFS Hash</h4>
                   <div className="flex items-center space-x-2">
-                    <code className="flex-1 text-sm bg-white p-2 rounded font-mono">
+                    <code className="flex-1 text-sm bg-white dark:bg-gray-800 p-2 rounded font-mono break-all text-gray-700 dark:text-gray-300">
                       {analysisResults.metadata.ipfsHash}
                     </code>
                     <button 
                       onClick={() => copyToClipboard(analysisResults.metadata.ipfsHash)}
-                      className="p-2 text-gray-500 hover:text-gray-700"
+                      className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex-shrink-0"
+                      title="Copy IPFS hash"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
+                  <div className="mt-2">
+                    <a 
+                      href={`https://gateway.pinata.cloud/ipfs/${analysisResults.metadata.ipfsHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center space-x-1"
+                    >
+                      <span>View on IPFS Gateway</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </a>
+                  </div>
                 </div>
                 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-900 mb-3">Smart Contract</h4>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Smart Contract</h4>
                   <div className="flex items-center space-x-2">
-                    <code className="flex-1 text-sm bg-white p-2 rounded font-mono">
+                    <code className="flex-1 text-sm bg-white dark:bg-gray-800 p-2 rounded font-mono text-gray-700 dark:text-gray-300">
                       {analysisResults.metadata.contractAddress}
                     </code>
                     <button 
                       onClick={() => copyToClipboard(analysisResults.metadata.contractAddress)}
-                      className="p-2 text-gray-500 hover:text-gray-700"
+                      className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
@@ -556,20 +765,23 @@ const FileScopeApp = () => {
             </div>
 
             {/* Action Bar */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mt-8">
               <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Ready for More?</h3>
-                  <p className="text-gray-600">Analyze another dataset or explore public analyses</p>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Ready for More?</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Analyze another dataset or explore public analyses</p>
                 </div>
                 <div className="flex space-x-4">
                   <button 
                     onClick={() => navigateToStep('upload')}
-                    className="border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:border-gray-400 transition-colors"
+                    className="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-6 py-2 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
                   >
                     Analyze Another
                   </button>
-                  <button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg">
+                  <button 
+                    onClick={() => router.push('/explorer')}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
+                  >
                     Explore Datasets
                   </button>
                 </div>
@@ -596,7 +808,7 @@ const FileScopeApp = () => {
 
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
               {/* File Header */}
-              <div className="bg-gray-50 p-6 border-b border-gray-200">
+              <div className="bg-gray-50 dark:bg-gray-700 p-6 border-b border-gray-200 dark:border-gray-600">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
@@ -606,8 +818,8 @@ const FileScopeApp = () => {
                       })()}
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">{uploadedFile?.name}</h3>
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">{uploadedFile?.name}</h3>
+                      <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
                         <span>{formatFileSize(uploadedFile?.size || 0)}</span>
                         <span>•</span>
                         <span>{filePreview?.totalLines?.toLocaleString()} rows</span>
@@ -618,7 +830,7 @@ const FileScopeApp = () => {
                   </div>
                   <button 
                     onClick={() => navigateToStep('upload')} 
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     <X className="w-6 h-6" />
                   </button>
@@ -627,14 +839,14 @@ const FileScopeApp = () => {
 
               {/* Data Preview */}
               <div className="p-6">
-                <h4 className="text-lg font-bold text-gray-900 mb-4">Data Preview</h4>
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Data Preview</h4>
                 {filePreview && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-gray-50">
+                        <tr className="bg-gray-50 dark:bg-gray-700">
                           {filePreview.headers.slice(0, 6).map((header, index) => (
-                            <th key={index} className="px-4 py-3 text-left font-medium text-gray-900 border-b">
+                            <th key={index} className="px-4 py-3 text-left font-medium text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-600">
                               {header}
                             </th>
                           ))}
@@ -642,9 +854,9 @@ const FileScopeApp = () => {
                       </thead>
                       <tbody>
                         {filePreview.sampleRows.slice(0, 5).map((row, rowIndex) => (
-                          <tr key={rowIndex} className="border-b border-gray-100">
+                          <tr key={rowIndex} className="border-b border-gray-100 dark:border-gray-700">
                             {row.slice(0, 6).map((cell, cellIndex) => (
-                              <td key={cellIndex} className="px-4 py-3 text-gray-700">
+                              <td key={cellIndex} className="px-4 py-3 text-gray-700 dark:text-gray-300">
                                 {String(cell).length > 30 ? String(cell).substring(0, 30) + '...' : String(cell)}
                               </td>
                             ))}
@@ -657,33 +869,76 @@ const FileScopeApp = () => {
               </div>
 
               {/* Analysis Options */}
-              <div className="bg-gray-50 p-6 border-t border-gray-200">
-                <h4 className="text-lg font-bold text-gray-900 mb-4">AI Analysis Features</h4>
+              <div className="bg-gray-50 dark:bg-gray-700 p-6 border-t border-gray-200 dark:border-gray-600">
+                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">AI Analysis Features</h4>
                 <div className="grid md:grid-cols-3 gap-4 mb-6">
-                  <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
                     <BarChart3 className="w-5 h-5 text-blue-600" />
-                    <span className="font-medium text-gray-900">Anomaly Detection</span>
+                    <span className="font-medium text-gray-900 dark:text-white">Anomaly Detection</span>
                   </div>
-                  <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
                     <Shield className="w-5 h-5 text-green-600" />
-                    <span className="font-medium text-gray-900">Bias Assessment</span>
+                    <span className="font-medium text-gray-900 dark:text-white">Bias Assessment</span>
                   </div>
-                  <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="flex items-center space-x-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
                     <Zap className="w-5 h-5 text-purple-600" />
-                    <span className="font-medium text-gray-900">Quality Scoring</span>
+                    <span className="font-medium text-gray-900 dark:text-white">Quality Scoring</span>
+                  </div>
+                </div>
+
+                {/* Visibility Toggle */}
+                <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        isPublic 
+                          ? 'bg-blue-50 dark:bg-blue-900/30' 
+                          : 'bg-gray-50 dark:bg-gray-700'
+                      }`}>
+                        {isPublic ? (
+                          <Eye className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                        )}
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-gray-900 dark:text-white">
+                          {isPublic ? 'Public Dataset' : 'Private Dataset'}
+                        </h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {isPublic 
+                            ? 'Analysis will be visible to everyone in the explorer' 
+                            : 'Analysis will only be visible to you'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsPublic(!isPublic)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                        isPublic ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isPublic ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                     <Info className="w-4 h-4" />
                     <span>Analysis will be stored permanently on Filecoin</span>
                   </div>
                   <button 
                     onClick={startAnalysis}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg font-medium flex items-center space-x-2"
+                    disabled={isUploading}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <span>Start AI Analysis</span>
+                    <span>{isUploading ? 'Uploading...' : 'Start AI Analysis'}</span>
                     <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
@@ -802,9 +1057,9 @@ const FileScopeApp = () => {
 
   // Helper functions for results
   const getScoreColor = (score: number) => {
-    if (score >= 90) return 'text-green-600 bg-green-50 border-green-200';
-    if (score >= 70) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    return 'text-red-600 bg-red-50 border-red-200';
+    if (score >= 90) return 'text-green-600 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800';
+    if (score >= 70) return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800';
+    return 'text-red-600 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800';
   };
 
   const getInsightIcon = (type: string) => {
@@ -819,10 +1074,10 @@ const FileScopeApp = () => {
 
   const getInsightColor = (type: string) => {
     const colors: Record<string, string> = {
-      critical: 'text-red-600 bg-red-50 border-red-200',
-      warning: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-      success: 'text-green-600 bg-green-50 border-green-200',
-      info: 'text-blue-600 bg-blue-50 border-blue-200'
+      critical: 'text-red-600 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800',
+      warning: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800',
+      success: 'text-green-600 bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800',
+      info: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800'
     };
     return colors[type];
   };
