@@ -26,25 +26,43 @@ interface AnalysisResult {
 
 const ResultsPage = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [mounted, setMounted] = useState(false);
 
   // Wallet connection check
   const { isConnected } = useAccount();
   const router = useRouter();
 
+  // Set mounted state after component mounts
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Check wallet connection on mount
   useEffect(() => {
-    if (!isConnected) {
+    if (mounted && !isConnected) {
       toast.error('Please connect your wallet to use this feature', {
         duration: 4000,
         icon: '🔒',
       });
       router.push('/');
     }
-  }, [isConnected, router]);
+  }, [isConnected, router, mounted]);
 
   // Don't render if wallet is not connected
-  if (!isConnected) {
-    return null;
+  if (!mounted || !isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/20 py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Loading...</h1>
+            <p className="text-gray-600 dark:text-gray-300">Please wait while we check your wallet connection.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Mock analysis results - in real app, this would come from API
@@ -105,7 +123,7 @@ const ResultsPage = () => {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <div className={`p-3 rounded-xl ${getQualityBg(results.qualityScore)}`}>
                 <BarChart3 className={`w-6 h-6 ${getQualityColor(results.qualityScore)}`} />
@@ -117,7 +135,7 @@ const ResultsPage = () => {
             <div className="text-sm text-gray-600 dark:text-gray-400">Quality Score</div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 rounded-xl bg-red-100 dark:bg-red-900/30">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -129,7 +147,7 @@ const ResultsPage = () => {
             <div className="text-sm text-gray-600 dark:text-gray-400">Anomalies Found</div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30">
                 <Shield className="w-6 h-6 text-blue-600" />
@@ -141,7 +159,7 @@ const ResultsPage = () => {
             <div className="text-sm text-gray-600 dark:text-gray-400">Bias Score</div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30">
                 <Zap className="w-6 h-6 text-purple-600" />
@@ -155,7 +173,7 @@ const ResultsPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden mb-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="flex space-x-8 px-6">
               {[
@@ -188,10 +206,10 @@ const ResultsPage = () => {
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Quality Assessment</h3>
                   <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <span className="font-medium text-gray-900 dark:text-white">Overall Quality</span>
                         <div className="flex items-center space-x-2">
-                          <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div className="w-20 h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
                             <div 
                               className={`h-full rounded-full ${results.qualityScore >= 90 ? 'bg-green-500' : results.qualityScore >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
                               style={{width: `${results.qualityScore}%`}}
@@ -203,17 +221,17 @@ const ResultsPage = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <span className="font-medium text-gray-900 dark:text-white">Completeness</span>
                         <span className="font-bold text-green-600">{results.completeness}%</span>
                       </div>
                       
-                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                         <span className="font-medium text-gray-900 dark:text-white">Accuracy</span>
                         <span className="font-bold text-green-600">{results.accuracy}%</span>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-4">
                       <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
                         <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">Dataset Summary</h4>
@@ -250,15 +268,15 @@ const ResultsPage = () => {
                     Anomaly Detection Results
                   </h4>
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
                       <div className="text-2xl font-bold text-red-600 mb-1">{results.anomalies}</div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Total Anomalies</div>
                     </div>
-                    <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
                       <div className="text-2xl font-bold text-yellow-600 mb-1">3</div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Critical Issues</div>
                     </div>
-                    <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
                       <div className="text-2xl font-bold text-blue-600 mb-1">20</div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">Minor Issues</div>
                     </div>
@@ -316,18 +334,18 @@ const ResultsPage = () => {
                       </div>
                     </div>
 
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                       <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">IPFS Hash</h4>
-                      <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded font-mono text-sm text-gray-700 dark:text-gray-300 break-all">
+                      <div className="bg-gray-100 dark:bg-gray-600 p-3 rounded font-mono text-sm text-gray-700 dark:text-gray-300 break-all">
                         {results.ipfsHash}
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-6">
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                       <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Transaction Hash</h4>
-                      <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded font-mono text-sm text-gray-700 dark:text-gray-300 break-all">
+                      <div className="bg-gray-100 dark:bg-gray-600 p-3 rounded font-mono text-sm text-gray-700 dark:text-gray-300 break-all">
                         {results.blockchainHash}
                       </div>
                     </div>

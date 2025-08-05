@@ -67,25 +67,43 @@ const DatasetExplorer = () => {
     verified: 'all',
     fileType: 'all'
   });
+  const [mounted, setMounted] = useState(false);
 
   // Wallet connection check
   const { isConnected } = useAccount();
   const router = useRouter();
 
+  // Set mounted state after component mounts
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Check wallet connection on mount
   useEffect(() => {
-    if (!isConnected) {
+    if (mounted && !isConnected) {
       toast.error('Please connect your wallet to use this feature', {
         duration: 4000,
         icon: '🔒',
       });
       router.push('/');
     }
-  }, [isConnected, router]);
+  }, [isConnected, router, mounted]);
 
   // Don't render if wallet is not connected
-  if (!isConnected) {
-    return null;
+  if (!mounted || !isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Database className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Loading...</h1>
+            <p className="text-gray-600 dark:text-gray-300">Please wait while we check your wallet connection.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Mock dataset repository
