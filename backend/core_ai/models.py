@@ -47,7 +47,8 @@ class DatasetAnalysis(models.Model):
     full_analysis = models.JSONField(default=dict)
     quality_score = models.FloatField(default=0)
     rows_count = models.IntegerField(default=0)
-    column_count = models.IntegerField(default=0)
+    columns_count = models.IntegerField(default=0)
+    full_analysis = models.JSONField(default=dict)
 
 
 
@@ -56,6 +57,41 @@ class DatasetAnalysis(models.Model):
     # Insights
     key_insights = models.JSONField(default=dict, blank=True)
     visualization_data = models.JSONField(default=dict, blank=True)
+    full_analysis = models.JSONField(default=dict)
     
     def __str__(self):
         return f"Analysis #{self.id} - {self.status}"
+    
+    def get_analysis_report(self):
+        return {
+            "metadata": self._get_metadata(),
+            "data_profile": self.full_analysis.get("data_profile", {}),
+            "quality_metrics": self._get_quality_metrics(),
+            "advanced_analysis": self._get_advanced_analysis()
+        }
+    
+    def _get_metadata(self):
+        return {
+            "dataset_id": str(self.id),
+            "file_name": self.file_name,
+            "dimensions": f"{self.rows_count} rows × {self.columns_count} columns",
+            "upload_date": self.uploaded_at.isoformat(),
+            "processing_time": self.full_analysis.get("processing_time")
+        }
+    
+    def _get_quality_metrics(self):
+        return {
+            "overall_score": self.quality_score,
+            "completeness": self.full_analysis.get("completeness_score"),
+            "duplicates": self.full_analysis.get("duplicate_analysis"),
+            "anomalies": self.full_analysis.get("anomaly_analysis"),
+            "schema_validation": self.full_analysis.get("schema_issues")
+        }
+    
+    def _get_advanced_analysis(self):
+        return {
+            "correlations": self.full_analysis.get("correlation_matrix"),
+            "bias_assessment": self.full_analysis.get("bias_analysis"),
+            "nlp_insights": self.full_analysis.get("text_analysis"),
+            "visualization_suggestions": self.visualizations
+        }
