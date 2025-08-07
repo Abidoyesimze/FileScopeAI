@@ -25,8 +25,10 @@ SECRET_KEY = 'django-insecure-#-zojy525+1oix@yrk4*d!*hxv#n7g9p0$)hveoo&+!qg*q%ab
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    'filescopeai.onrender.com',
+    'http://localhost:3000'
+]
 
 # Application definition
 
@@ -72,6 +74,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'filescope_ai.wsgi.application'
 
+
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
