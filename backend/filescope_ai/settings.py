@@ -72,6 +72,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'filescope_ai.wsgi.application'
 
+ALLOWED_HOSTS = [
+    'filescopeai.onrender.com',
+    'http://localhost:3000'
+    '127.0.0.1',
+]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
