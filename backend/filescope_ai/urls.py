@@ -17,8 +17,19 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework import permissions
+# from drf_yasg.views import get_schema_view
+# from drf_yasg import openapi
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core_ai.urls')),
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('swagger/', SpectacularSwaggerView.as_view(url_name='schema')),
+    # path('swagger/', schema_view.with_ui('swagger', cache_timeout=0)),
+    # path('redoc/', schema_view.with_ui('redoc', cache_timeout=0)),
 ]
