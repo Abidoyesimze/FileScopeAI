@@ -4,7 +4,7 @@ from .views import upload_dataset, get_analysis_status, delete_analysis, list_us
 urlpatterns = [
     path('api/upload/', upload_dataset, name='upload'),
     path('api/analysis/<int:analysis_id>/', get_analysis_status, name='analysis_status'),
-    path('analysis/<uuid:analysis_id>/status/', get_analysis_status, name='get_analysis_status'),
+    path('analysis/<int:analysis_id>/status/', get_analysis_status, name='get_analysis_status'),
     path('analysis/<uuid:analysis_id>/delete/', delete_analysis, name='delete_analysis'),
     
     # User's analyses
