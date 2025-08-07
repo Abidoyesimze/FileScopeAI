@@ -5,17 +5,32 @@ from rest_framework import status
 from django.core.files.storage import default_storage
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view
 from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import DatasetAnalysis
+# from drf_yasg.utils import swagger_auto_schema
+# from drf_yasg import openapi
 import mimetypes
 from django.conf import settings
 import pandas as pd
-from django.core.files.storage import default_storage
 from .tasks import process_dataset, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
 import os
 import uuid
 import os
+import os
+import uuid
+import logging
+import pandas as pd
+from django.conf import settings
+from .models import DatasetAnalysis
+from .filecoin_storage import FilecoinStorage 
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_EXTENSIONS = {'.csv', '.json', '.xlsx', '.xls', '.parquet'}
+MAX_FILE_SIZE = 100 * 1024 * 1024 
+
 
 from .tasks import (
     process_dataset,
@@ -33,6 +48,96 @@ from .tasks import process_dataset
 from .filecoin_storage import FilecoinStorage
 import logging
 logger = logging.getLogger(__name__)
+
+
+# @swagger_auto_schema(
+#     method='post',
+#     operation_description="Upload a dataset for analysis",
+#     request_body=openapi.Schema(
+#         type=openapi.TYPE_OBJECT,
+#         required=['file'],
+#         properties={
+#             'file': openapi.Schema(
+#                 type=openapi.TYPE_FILE,
+#                 description='Dataset file (CSV, JSON, Excel)'
+#             )
+#         }
+#     ),
+#     manual_parameters=[
+#         openapi.Parameter(
+#             'include_visualizations',
+#             openapi.QUERY,
+#             description="Include visualization data",
+#             type=openapi.TYPE_BOOLEAN,
+#             default=False
+#         )
+#     ],
+#     responses={
+#         200: openapi.Response(
+#             description='Analysis results',
+#             schema=openapi.Schema(
+#                 type=openapi.TYPE_OBJECT,
+#                 properties={
+#                     'analysis_id': openapi.Schema(type=openapi.TYPE_STRING),
+#                     'status': openapi.Schema(type=openapi.TYPE_STRING),
+#                     'results': openapi.Schema(
+#                         type=openapi.TYPE_OBJECT,
+#                         properties={
+#                             'metrics': openapi.Schema(type=openapi.TYPE_OBJECT),
+#                             'insights': openapi.Schema(type=openapi.TYPE_OBJECT)
+#                         }
+#                     ),
+#                     'visualizations': openapi.Schema(
+#                         type=openapi.TYPE_OBJECT,
+#                         properties={
+#                             'available': openapi.Schema(
+#                                 type=openapi.TYPE_ARRAY,
+#                                 items=openapi.Items(type=openapi.TYPE_STRING)
+#                             ),
+#                             'types': openapi.Schema(type=openapi.TYPE_OBJECT),
+#                             'descriptions': openapi.Schema(type=openapi.TYPE_OBJECT),
+#                             'included': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+#                             'data': openapi.Schema(type=openapi.TYPE_OBJECT)
+#                         }
+#                     )
+#                 }
+#             )
+#         ),
+#         400: 'Invalid file format',
+#         413: 'File too large',
+#         500: 'Processing error'
+#     }
+# )
+
+# @swagger_auto_schema(
+#     method='get',
+#     operation_description="Get analysis status and results",
+#     manual_parameters=[
+#         openapi.Parameter(
+#             'include_visualizations',
+#             openapi.QUERY,
+#             description="Include visualization data",
+#             type=openapi.TYPE_BOOLEAN,
+#             default=False
+#         )
+#     ],
+#     responses={
+#         200: openapi.Response(
+#             description='Analysis results',
+#             schema=openapi.Schema(
+#                 type=openapi.TYPE_OBJECT,
+#                 properties={
+#                     'metadata': openapi.Schema(type=openapi.TYPE_OBJECT),
+#                     'results': openapi.Schema(type=openapi.TYPE_OBJECT),
+#                     'visualizations': openapi.Schema(type=openapi.TYPE_OBJECT)
+#                 }
+#             )
+#         ),
+#         404: 'Analysis not found',
+#         500: 'Server error'
+#     }
+# )
+
 
 # ALLOWED_EXTENSIONS = {'.csv', '.json', '.xlsx', '.xls', '.parquet'}
 # MAX_FILE_SIZE = 100 * 1024 * 1024  
@@ -161,22 +266,7 @@ logger = logging.getLogger(__name__)
 #             {'error': 'Analysis not found or access denied'}, 
 #             status=status.HTTP_404_NOT_FOUND
 #         )
-import os
-import uuid
-import logging
-import pandas as pd
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from django.core.files.storage import default_storage
-from django.conf import settings
-from .models import DatasetAnalysis
-from .filecoin_storage import FilecoinStorage  # Your custom Filecoin storage
 
-logger = logging.getLogger(__name__)
-
-ALLOWED_EXTENSIONS = {'.csv', '.json', '.xlsx', '.xls', '.parquet'}
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
 @api_view(['POST'])
 def upload_dataset(request):

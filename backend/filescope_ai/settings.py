@@ -27,7 +27,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     'filescopeai.onrender.com',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'localhost'
 ]
 
 # Application definition
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'core_ai',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -78,6 +80,35 @@ WSGI_APPLICATION = 'filescope_ai.wsgi.application'
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # Adjust as needed
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Filescope AI API',
+    'DESCRIPTION': 'API documentation for Filescope AI project',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    
+    # Optional: Swagger UI customization
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': True,
+        'filter': True,
+    },
+    
+    # Optional: Schema customization
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SORT_OPERATIONS': False,
+}
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
@@ -87,6 +118,7 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
 
 
 # Password validation
