@@ -739,193 +739,193 @@ const DatasetExplorer = () => {
           </div>
         )}
 
-        {/* Dataset Detail Modal */}
-        {selectedDataset && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-6 rounded-t-2xl">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedDataset.title}</h2>
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded">
-                        {selectedDataset.category}
-                      </span>
-                      {selectedDataset.analysis.verified && (
-                        <div className="flex items-center space-x-1 text-green-600">
-                          <Verified className="w-4 h-4" />
-                          <span className="text-sm font-medium">Verified</span>
-                        </div>
-                      )}
-                      <div className={`px-3 py-1 rounded text-sm font-medium ${getQualityColor(selectedDataset.analysis.qualityScore)}`}>
-                        Quality: {selectedDataset.analysis.qualityScore}%
-                      </div>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setSelectedDataset(null)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+        {/* Dataset Detail Modal*/}
+{selectedDataset && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      {/* Modal Header */}
+      <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6 rounded-t-2xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{selectedDataset.title}</h2>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded">
+                {selectedDataset.category}
+              </span>
+              {selectedDataset.analysis.verified && (
+                <div className="flex items-center space-x-1 text-green-600">
+                  <Verified className="w-4 h-4" />
+                  <span className="text-sm font-medium">Verified</span>
                 </div>
-              </div>
-
-              {/* Modal Content */}
-              <div className="p-6 space-y-8">
-                {/* Description */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                  <p className="text-gray-600 leading-relaxed">{selectedDataset.description}</p>
-                </div>
-
-                {/* Metadata Grid */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Dataset Information</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">File Size:</span>
-                        <span className="font-medium">{selectedDataset.metadata.size}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Rows:</span>
-                        <span className="font-medium">{formatNumber(selectedDataset.metadata.rows)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Columns:</span>
-                        <span className="font-medium">{selectedDataset.metadata.columns}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Format:</span>
-                        <span className="font-medium">{selectedDataset.metadata.format}</span>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Views:</span>
-                        <span className="font-medium">{formatNumber(selectedDataset.stats.views)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Downloads:</span>
-                        <span className="font-medium">{formatNumber(selectedDataset.stats.downloads)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Citations:</span>
-                        <span className="font-medium">{selectedDataset.stats.citations}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Upload Date:</span>
-                        <span className="font-medium">{formatDate(selectedDataset.metadata.uploadDate)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Analysis Results */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Analysis Results</h3>
-                  <div className="grid md:grid-cols-4 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.analysis.qualityScore}%</div>
-                      <div className="text-sm text-gray-600">Quality Score</div>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.analysis.anomalies}</div>
-                      <div className="text-sm text-gray-600">Anomalies</div>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.analysis.biasScore}%</div>
-                      <div className="text-sm text-gray-600">Bias Score</div>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg text-center">
-                      <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.analysis.completeness}%</div>
-                      <div className="text-sm text-gray-600">Completeness</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Blockchain Verification */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Blockchain Verification</h3>
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="font-medium text-green-900">Analysis Verified on Filecoin</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-green-700">IPFS Hash:</span>
-                        <code className="text-sm bg-white px-2 py-1 rounded font-mono">
-                          {selectedDataset.analysis.ipfsHash}
-                        </code>
-                        <button className="text-green-600 hover:text-green-700">
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Tags</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedDataset.tags.map((tag, index) => (
-                      <span key={index} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Uploader Info */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Uploaded By</h3>
-                  <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900">{selectedDataset.uploader.name}</span>
-                        {selectedDataset.uploader.verified && (
-                          <Verified className="w-4 h-4 text-green-600" />
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Reputation: {selectedDataset.uploader.reputation}/100
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {selectedDataset.uploader.address}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 rounded-b-2xl">
-                <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
-                  <div className="text-sm text-gray-600">
-                    Last updated {formatDate(selectedDataset.metadata.lastUpdated)}
-                  </div>
-                  <div className="flex space-x-4">
-                    <button className="border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:border-gray-400 transition-colors flex items-center space-x-2">
-                      <Download className="w-4 h-4" />
-                      <span>Download Dataset</span>
-                    </button>
-                    <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
-                      <BarChart3 className="w-4 h-4" />
-                      <span>View Full Analysis</span>
-                    </button>
-                  </div>
-                </div>
+              )}
+              <div className={`px-3 py-1 rounded text-sm font-medium ${getQualityColor(selectedDataset.analysis.qualityScore)}`}>
+                Quality: {selectedDataset.analysis.qualityScore}%
               </div>
             </div>
           </div>
-        )}
+          <button 
+            onClick={() => setSelectedDataset(null)}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+      </div>
+
+      {/* Modal Content */}
+      <div className="p-6 space-y-8">
+        {/* Description */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Description</h3>
+          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-base">{selectedDataset.description}</p>
+        </div>
+
+        {/* Dataset Information - IMPROVED TEXT SIZES */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Dataset Information</h3>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-5">
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">File Size:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{selectedDataset.metadata.size}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">Rows:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{formatNumber(selectedDataset.metadata.rows)}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">Columns:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{selectedDataset.metadata.columns}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">Format:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{selectedDataset.metadata.format}</span>
+              </div>
+            </div>
+            <div className="space-y-5">
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">Views:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{formatNumber(selectedDataset.stats.views)}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">Downloads:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{formatNumber(selectedDataset.stats.downloads)}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">Citations:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{selectedDataset.stats.citations}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-gray-100 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 text-base font-medium">Upload Date:</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-base">{formatDate(selectedDataset.metadata.uploadDate)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Analysis Results*/}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">AI Analysis Results</h3>
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg text-center">
+              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{selectedDataset.analysis.qualityScore}%</div>
+              <div className="text-base text-gray-600 dark:text-gray-300 font-medium">Quality Score</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg text-center">
+              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{selectedDataset.analysis.anomalies}</div>
+              <div className="text-base text-gray-600 dark:text-gray-300 font-medium">Anomalies</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg text-center">
+              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{selectedDataset.analysis.biasScore}%</div>
+              <div className="text-base text-gray-600 dark:text-gray-300 font-medium">Bias Score</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg text-center">
+              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{selectedDataset.analysis.completeness}%</div>
+              <div className="text-base text-gray-600 dark:text-gray-300 font-medium">Completeness</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Blockchain Verification - IMPROVED TEXT SIZES */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Blockchain Verification</h3>
+          <div className="bg-green-50 dark:bg-green-900/30 p-6 rounded-lg border border-green-200 dark:border-green-800">
+            <div className="flex items-center space-x-3 mb-4">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+              <span className="font-semibold text-green-900 dark:text-green-100 text-lg">Analysis Verified on Filecoin</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <span className="text-base text-green-700 dark:text-green-300 font-medium">IPFS Hash:</span>
+                <code className="text-sm bg-white dark:bg-gray-800 px-3 py-2 rounded font-mono flex-1 text-gray-800 dark:text-gray-200">
+                  {selectedDataset.analysis.ipfsHash}
+                </code>
+                <button className="text-green-600 hover:text-green-700 dark:hover:text-green-400 p-1">
+                  <Copy className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tags - IMPROVED TEXT SIZES */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Tags</h3>
+          <div className="flex flex-wrap gap-3">
+            {selectedDataset.tags.map((tag, index) => (
+              <span key={index} className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-full text-base font-medium">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Uploader Info  */}
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Uploaded By</h3>
+          <div className="flex items-center space-x-4 p-6 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+              <User className="w-7 h-7 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="font-semibold text-gray-900 dark:text-white text-lg">{selectedDataset.uploader.name}</span>
+                {selectedDataset.uploader.verified && (
+                  <Verified className="w-5 h-5 text-green-600" />
+                )}
+              </div>
+              <div className="text-base text-gray-600 dark:text-gray-300 mb-1">
+                Reputation: {selectedDataset.uploader.reputation}/100
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                {selectedDataset.uploader.address}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Footer */}
+      <div className="sticky bottom-0 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 p-6 rounded-b-2xl">
+        <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
+          <div className="text-base text-gray-600 dark:text-gray-300">
+            Last updated {formatDate(selectedDataset.metadata.lastUpdated)}
+          </div>
+          <div className="flex space-x-4">
+            <button className="border border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg hover:border-gray-400 dark:hover:border-gray-400 transition-colors flex items-center space-x-2 text-base font-medium">
+              <Download className="w-5 h-5" />
+              <span>Download Dataset</span>
+            </button>
+            <button className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-base font-medium">
+              <BarChart3 className="w-5 h-5" />
+              <span>View Full Analysis</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  )}
       </div>
   );
 };
