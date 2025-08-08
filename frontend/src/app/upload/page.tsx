@@ -137,7 +137,7 @@ const FileScopeApp = () => {
     console.log('💾 Saved state to sessionStorage:', state);
   }, [currentStep, analysisProgress, currentAnalysisId, uploadedFile, isPublic]);
 
-  // IPFS Upload Function using Pinata
+  // IPFS Upload Function using Pinata - Now stores both original file and analysis results
   const uploadToIPFS = useCallback(async (file: File, analysisResults: FrontendAnalysisResult) => {
     try {
       console.log('🌐 Starting IPFS upload...');
@@ -146,11 +146,48 @@ const FileScopeApp = () => {
         throw new Error('Pinata JWT secret not configured');
       }
       
-      // Create metadata for IPFS
+      // Step 1: Upload the original file to IPFS
+      console.log('📁 Uploading original file to IPFS...');
+      const originalFileFormData = new FormData();
+      originalFileFormData.append('file', file);
+      
+      const originalFileResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${PINATA_JWT_SECRET}`,
+        },
+        body: originalFileFormData,
+      });
+
+      if (!originalFileResponse.ok) {
+        throw new Error(`Original file IPFS upload failed: ${originalFileResponse.statusText}`);
+      }
+
+      const originalFileResult = await originalFileResponse.json();
+      const originalFileHash = originalFileResult.IpfsHash;
+      console.log('✅ Original file uploaded to IPFS:', originalFileHash);
+      
+      // Step 2: Create comprehensive metadata including original file reference
       const metadata = {
         name: file.name,
         description: `AI Analysis Results for ${file.name}`,
-        image: null,
+        originalFile: {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          ipfsHash: originalFileHash,
+          uploadDate: new Date().toISOString()
+        },
+        analysis: {
+          timestamp: new Date().toISOString(),
+          qualityScore: analysisResults.qualityScore?.overall || 0,
+          anomalies: analysisResults.anomalies?.total || 0,
+          completeness: analysisResults.qualityScore?.completeness || 0,
+          consistency: analysisResults.qualityScore?.consistency || 0,
+          accuracy: analysisResults.qualityScore?.accuracy || 0,
+          validity: analysisResults.qualityScore?.validity || 0
+        },
+        results: analysisResults,
         attributes: [
           {
             trait_type: "File Type",
@@ -171,34 +208,45 @@ const FileScopeApp = () => {
           {
             trait_type: "Analysis Date",
             value: new Date().toISOString()
+          },
+          {
+            trait_type: "Original File Available",
+            value: "Yes"
           }
         ]
       };
 
-      // Upload metadata to IPFS
-      const metadataBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
-      const metadataFile = new File([metadataBlob], 'metadata.json', { type: 'application/json' });
+      // Step 3: Upload comprehensive metadata to IPFS
+      console.log('📊 Uploading analysis results to IPFS...');
+      const metadataBlob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+      const metadataFile = new File([metadataBlob], 'analysis_results.json', { type: 'application/json' });
 
-      const formData = new FormData();
-      formData.append('file', metadataFile);
+      const analysisFormData = new FormData();
+      analysisFormData.append('file', metadataFile);
 
-      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      const analysisResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${PINATA_JWT_SECRET}`,
         },
-        body: formData,
+        body: analysisFormData,
       });
 
-      if (!response.ok) {
-        throw new Error(`IPFS upload failed: ${response.statusText}`);
+      if (!analysisResponse.ok) {
+        throw new Error(`Analysis results IPFS upload failed: ${analysisResponse.statusText}`);
       }
 
-      const result = await response.json();
-      const hash = result.IpfsHash;
+      const analysisResult = await analysisResponse.json();
+      const analysisHash = analysisResult.IpfsHash;
       
-      console.log('✅ IPFS upload successful:', hash);
-      return hash;
+      console.log('✅ Analysis results uploaded to IPFS:', analysisHash);
+      console.log('📋 Summary:');
+      console.log('- Original file hash:', originalFileHash);
+      console.log('- Analysis results hash:', analysisHash);
+      
+      // Return the analysis hash (this is what gets stored on blockchain)
+      // The original file hash is embedded in the analysis results
+      return analysisHash;
     } catch (error) {
       console.error('❌ IPFS upload failed:', error);
       throw new Error(`Failed to upload to IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -238,6 +286,46 @@ const FileScopeApp = () => {
           sampleRows: lines.slice(1, 6).map((row: string) => row.split(',')),
           totalLines: lines.length - 1
         };
+      } else if (file.type === 'application/json') {
+        try {
+          const jsonData = JSON.parse(content);
+          
+          if (Array.isArray(jsonData)) {
+            // Handle array of objects
+            if (jsonData.length > 0 && typeof jsonData[0] === 'object') {
+              const firstItem = jsonData[0];
+              preview = {
+                headers: Object.keys(firstItem),
+                sampleRows: jsonData.slice(0, 5).map((item: any) => 
+                  Object.values(item).map((val: any) => String(val))
+                ),
+                totalLines: jsonData.length
+              };
+            } else {
+              // Handle simple array
+              preview = {
+                headers: ['value'],
+                sampleRows: jsonData.slice(0, 5).map((item: any) => [String(item)]),
+                totalLines: jsonData.length
+              };
+            }
+          } else if (typeof jsonData === 'object') {
+            // Handle object
+            const keys = Object.keys(jsonData);
+            preview = {
+              headers: keys,
+              sampleRows: [Object.values(jsonData).map((val: any) => String(val))],
+              totalLines: 1
+            };
+          }
+        } catch (error) {
+          console.error('Error parsing JSON for preview:', error);
+          preview = {
+            headers: ['Error'],
+            sampleRows: [['Could not parse JSON file']],
+            totalLines: 0
+          };
+        }
       }
       
       setFilePreview(preview);
@@ -263,6 +351,39 @@ const FileScopeApp = () => {
       return;
     }
 
+    // Additional validation for JSON files
+    if (file.type === 'application/json') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          JSON.parse(content); // This will throw if JSON is invalid
+          
+          // Check if it's an array or object
+          const parsed = JSON.parse(content);
+          if (!Array.isArray(parsed) && typeof parsed !== 'object') {
+            setError('JSON file must contain an array or object. Please check your JSON format.');
+            toast.error('Invalid JSON format. File must contain an array or object.');
+            return;
+          }
+          
+          // If JSON is valid, proceed with upload
+          setUploadedFile(file);
+          generatePreview(file);
+          setCurrentStep('preview');
+          toast.success('JSON file validated successfully! Review your data below.');
+        } catch (jsonError) {
+          const errorMsg = 'Invalid JSON format. Please check your file and try again.';
+          setError(errorMsg);
+          toast.error(errorMsg);
+          console.error('JSON validation error:', jsonError);
+        }
+      };
+      reader.readAsText(file);
+      return;
+    }
+
+    // For non-JSON files, proceed normally
     setUploadedFile(file);
     generatePreview(file);
     setCurrentStep('preview');
@@ -318,6 +439,68 @@ const FileScopeApp = () => {
     
     setCurrentStep('preview');
     toast.success(`Using sample dataset: ${dataset.name}`);
+  }, []);
+
+  // Test JSON file validation
+  const testJSONFile = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const jsonData = JSON.parse(content);
+        
+        let analysis = {
+          isValid: true,
+          structure: '',
+          issues: [] as string[],
+          recommendations: [] as string[]
+        };
+        
+        if (Array.isArray(jsonData)) {
+          analysis.structure = 'Array';
+          if (jsonData.length === 0) {
+            analysis.issues.push('Array is empty');
+            analysis.recommendations.push('Add some data to the array');
+          } else if (typeof jsonData[0] === 'object') {
+            analysis.structure += ' of Objects';
+            const keys = Object.keys(jsonData[0]);
+            if (keys.length === 0) {
+              analysis.issues.push('Objects have no properties');
+              analysis.recommendations.push('Add properties to your objects');
+            }
+          }
+        } else if (typeof jsonData === 'object') {
+          analysis.structure = 'Object';
+          const keys = Object.keys(jsonData);
+          if (keys.length === 0) {
+            analysis.issues.push('Object has no properties');
+            analysis.recommendations.push('Add properties to your object');
+          }
+        } else {
+          analysis.isValid = false;
+          analysis.issues.push('Root must be an array or object');
+          analysis.recommendations.push('Wrap your data in an array or object');
+        }
+        
+        // Check for common issues
+        if (content.length > 10 * 1024 * 1024) { // 10MB
+          analysis.issues.push('File is very large');
+          analysis.recommendations.push('Consider using a smaller file or converting to CSV');
+        }
+        
+        if (analysis.isValid && analysis.issues.length === 0) {
+          toast.success('JSON file looks good! Ready for analysis.');
+        } else {
+          const message = `JSON Analysis:\nStructure: ${analysis.structure}\nIssues: ${analysis.issues.join(', ')}\nRecommendations: ${analysis.recommendations.join(', ')}`;
+          toast.error(message, { duration: 10000 });
+        }
+        
+      } catch (error) {
+        toast.error('Invalid JSON format. Please check your file.');
+        console.error('JSON validation error:', error);
+      }
+    };
+    reader.readAsText(file);
   }, []);
 
   const formatFileSize = useCallback((bytes: number) => {
@@ -377,6 +560,8 @@ const FileScopeApp = () => {
           errorMessage = 'Failed to store results on IPFS. Please try again.';
         } else if (error.message.includes('Blockchain') || error.message.includes('Contract')) {
           errorMessage = 'Blockchain registration failed. Please check your wallet and try again.';
+        } else if (error.message.includes('Server Error: Processing failed')) {
+          errorMessage = 'The server is having trouble processing this file. Try:\n\n• Converting your file to CSV format\n• Using a smaller file (under 50MB)\n• Checking if your JSON is properly formatted\n• Using one of our sample datasets';
         } else if (error.message.includes('failed')) {
           const match = error.message.match(/Upload failed \((\d+)\): (.+)/);
           if (match) {
@@ -391,7 +576,7 @@ const FileScopeApp = () => {
         }
       }
       
-      toast.error(errorMessage, { id: 'analysis' });
+      toast.error(errorMessage, { id: 'analysis', duration: 8000 });
       setCurrentStep('preview');
       setIsAnalyzing(false);
       clearSavedState(); // Clear saved state on error
@@ -1190,6 +1375,35 @@ const FileScopeApp = () => {
 
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Maximum file size: 100MB
+                </div>
+                
+                {/* JSON File Requirements */}
+                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">JSON File Requirements:</h4>
+                  <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                    <li>• Must be valid JSON format</li>
+                    <li>• Should contain an array of objects or a single object</li>
+                    <li>• Each object should have consistent key names</li>
+                    <li>• Avoid deeply nested structures</li>
+                    <li>• Consider converting to CSV for better compatibility</li>
+                  </ul>
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.json';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (file) {
+                          testJSONFile(file);
+                        }
+                      };
+                      input.click();
+                    }}
+                    className="mt-3 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Test JSON File
+                  </button>
                 </div>
               </div>
 

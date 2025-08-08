@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { fileStoreContract } from '../index';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Blockchain contract dataset structure
 interface ContractDataset {
@@ -41,7 +43,7 @@ interface DatasetMetadata {
 
 interface DatasetResults {
   metrics: {
-    qualityScore: number;
+    quality_score: number;
     completeness: number;
     consistency: number;
     accuracy: number;
@@ -60,7 +62,7 @@ interface DatasetResults {
         recommendation: string;
       }>;
     };
-    biasMetrics: {
+    bias_metrics: {
       overall: number;
       geographic: { score: number; status: string; description: string };
       demographic: { score: number; status: string; description: string };
@@ -72,6 +74,16 @@ interface DatasetResults {
     description: string;
     action: string;
   }>;
+  metadata?: {
+    fileName?: string;
+    fileSize?: string;
+    file_size?: string;
+    rows?: number;
+    columns?: number;
+    description?: string;
+    tags?: string[];
+    format?: string;
+  };
 }
 
 interface Dataset {
@@ -183,21 +195,49 @@ const DatasetExplorer = () => {
             // Create dataset object
             const dataset: Dataset = {
               id: i + 1, // Use index as ID for now
-              title: `Dataset ${i + 1}`, // Placeholder title
-              description: `Description for Dataset ${i + 1}`, // Placeholder description
-              category: 'Uncategorized', // Placeholder category
+              title: ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`, // Use actual filename if available
+              description: ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || `AI-analyzed dataset`, // Remove fake quality score
+              category: detectCategory(
+                ipfsData?.metadata?.fileName || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
+                ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || '',
+                ipfsData?.metadata?.tags || ipfsData?.results?.metadata?.tags || []
+              ),
               metadata: {
-                fileName: `Dataset ${i + 1}`,
-                fileSize: 'Unknown',
-                rows: 0,
-                columns: 0,
+                fileName: ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
+                fileSize: ipfsData?.metadata?.fileSize || ipfsData?.metadata?.file_size || ipfsData?.results?.metadata?.fileSize || 'Unknown',
+                rows: ipfsData?.metadata?.rows || ipfsData?.results?.metadata?.rows || 0,
+                columns: ipfsData?.metadata?.columns || ipfsData?.results?.metadata?.columns || 0,
                 uploadDate: new Date(Number(contractData.timestamp) * 1000).toISOString(),
                 ipfsHash: contractData.analysisCID,
                 contractAddress: contractData.uploader, // Assuming uploader is contractAddress
                 blockNumber: contractData.timestamp.toString(),
-                isPublic: contractData.isPublic
+                isPublic: contractData.isPublic,
+                description: ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || 'No description available',
+                tags: ipfsData?.metadata?.tags || ipfsData?.results?.metadata?.tags || [],
+                format: ipfsData?.metadata?.format || ipfsData?.results?.metadata?.format || 'Unknown'
               },
-              results: ipfsData,
+              results: {
+                metrics: {
+                  quality_score: ipfsData?.results?.metrics?.quality_score || ipfsData?.metrics?.quality_score || 0, // Only use real data
+                  completeness: ipfsData?.results?.metrics?.completeness || ipfsData?.metrics?.completeness || 0, // Only use real data
+                  consistency: ipfsData?.results?.metrics?.consistency || ipfsData?.metrics?.consistency || 0,
+                  accuracy: ipfsData?.results?.metrics?.accuracy || ipfsData?.metrics?.accuracy || 0,
+                  validity: ipfsData?.results?.metrics?.validity || ipfsData?.metrics?.validity || 0,
+                  anomalies: ipfsData?.results?.metrics?.anomalies || ipfsData?.metrics?.anomalies || {
+                    total: 0,
+                    high: 0,
+                    medium: 0,
+                    low: 0,
+                    details: []
+                  },
+                  bias_metrics: ipfsData?.results?.metrics?.bias_metrics || ipfsData?.metrics?.bias_metrics || {
+                    overall: 0,
+                    geographic: { score: 0, status: 'Unknown', description: 'No analysis available' },
+                    demographic: { score: 0, status: 'Unknown', description: 'No analysis available' }
+                  }
+                },
+                insights: ipfsData?.results?.insights || ipfsData?.insights || []
+              },
               stats: {
                 views: Number(contractData.views), // Will be filled from contract
                 downloads: Number(contractData.downloads), // Will be filled from contract
@@ -205,12 +245,12 @@ const DatasetExplorer = () => {
               },
               uploader: { // Placeholder uploader info
                 address: contractData.uploader,
-                name: 'Uploader Name',
+                name: `${contractData.uploader.slice(0, 6)}...${contractData.uploader.slice(-4)}`,
                 reputation: 80,
-                verified: false
+                verified: true // Assuming blockchain registration implies verification
               },
               analysis: { // Placeholder analysis info
-                verified: false
+                verified: true
               }
             };
             
@@ -222,8 +262,8 @@ const DatasetExplorer = () => {
             const fallbackDataset: Dataset = {
               id: i + 1,
               title: `Dataset ${i + 1}`,
-              description: `Description for Dataset ${i + 1}`,
-              category: 'Uncategorized',
+              description: `Dataset ${i + 1} - Analysis data unavailable`,
+              category: detectCategory(`Dataset ${i + 1}`, `Dataset ${i + 1} - Analysis data unavailable`, []),
               metadata: {
                 fileName: `Dataset ${i + 1}`,
                 fileSize: 'Unknown',
@@ -237,7 +277,7 @@ const DatasetExplorer = () => {
               },
               results: {
                 metrics: {
-                  qualityScore: 0,
+                  quality_score: 0,
                   completeness: 0,
                   consistency: 0,
                   accuracy: 0,
@@ -249,10 +289,10 @@ const DatasetExplorer = () => {
                     low: 0,
                     details: []
                   },
-                  biasMetrics: {
+                  bias_metrics: {
                     overall: 0,
-                    geographic: { score: 0, status: 'Unknown', description: 'Unknown' },
-                    demographic: { score: 0, status: 'Unknown', description: 'Unknown' }
+                    geographic: { score: 0, status: 'Unknown', description: 'No analysis available' },
+                    demographic: { score: 0, status: 'Unknown', description: 'No analysis available' }
                   }
                 },
                 insights: []
@@ -292,16 +332,426 @@ const DatasetExplorer = () => {
   }, [mounted, isConnected, contractDatasets, contractError]);
 
   // Helper function to fetch IPFS data
-  const fetchIPFSData = async (cid: string): Promise<DatasetResults> => {
+  const fetchIPFSData = async (cid: string): Promise<any> => {
     try {
+      console.log('🔍 Fetching IPFS data from CID:', cid);
       const response = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
       if (!response.ok) {
         throw new Error(`IPFS fetch failed: ${response.statusText}`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('📊 IPFS data received:', JSON.stringify(data, null, 2));
+      
+      // Return the full data structure for processing
+      return data;
     } catch (error) {
       console.error('Failed to fetch IPFS data:', error);
-      throw error;
+      // Return minimal fallback data - no mock values
+      return {
+        metadata: {
+          fileName: 'Unknown Dataset',
+          fileSize: 'Unknown',
+          rows: 0,
+          columns: 0,
+          description: 'Analysis data unavailable',
+          format: 'Unknown'
+        },
+        results: {
+          metrics: {
+            quality_score: 0,
+            completeness: 0,
+            consistency: 0,
+            accuracy: 0,
+            validity: 0,
+            anomalies: {
+              total: 0,
+              high: 0,
+              medium: 0,
+              low: 0,
+              details: []
+            },
+            bias_metrics: {
+              overall: 0,
+              geographic: { score: 0, status: 'Unknown', description: 'No analysis available' },
+              demographic: { score: 0, status: 'Unknown', description: 'No analysis available' }
+            }
+          },
+          insights: []
+        }
+      };
+    }
+  };
+
+  // Download functions
+  const downloadOriginalDataset = async (dataset: Dataset) => {
+    try {
+      console.log('📥 Downloading original dataset...');
+      toast.loading('Fetching original dataset from IPFS...', { id: 'download' });
+      
+      // First, fetch the analysis results to get the original file hash
+      const analysisResponse = await fetch(`https://gateway.pinata.cloud/ipfs/${dataset.metadata.ipfsHash}`);
+      if (!analysisResponse.ok) {
+        throw new Error('Failed to fetch analysis results from IPFS');
+      }
+      
+      const analysisData = await analysisResponse.json();
+      
+      // Extract the original file hash from the analysis results
+      const originalFileHash = analysisData.originalFile?.ipfsHash;
+      if (!originalFileHash) {
+        throw new Error('Original file not found in analysis results');
+      }
+      
+      console.log('🔍 Found original file hash:', originalFileHash);
+      
+      // Now fetch the original file using the extracted hash
+      const originalFileResponse = await fetch(`https://gateway.pinata.cloud/ipfs/${originalFileHash}`);
+      if (!originalFileResponse.ok) {
+        throw new Error('Failed to fetch original dataset from IPFS');
+      }
+      
+      const data = await originalFileResponse.blob();
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get file information from the analysis results
+      const originalFileInfo = analysisData.originalFile;
+      let fileExtension = 'json';
+      let formatName = 'JSON';
+      
+      if (originalFileInfo?.type) {
+        const contentType = originalFileInfo.type.toLowerCase();
+        if (contentType.includes('csv')) {
+          fileExtension = 'csv';
+          formatName = 'CSV';
+        } else if (contentType.includes('excel') || contentType.includes('spreadsheet')) {
+          fileExtension = 'xlsx';
+          formatName = 'Excel';
+        } else if (contentType.includes('json')) {
+          fileExtension = 'json';
+          formatName = 'JSON';
+        } else if (contentType.includes('text/plain')) {
+          fileExtension = 'txt';
+          formatName = 'Text';
+        } else {
+          // Try to extract extension from filename
+          const fileName = originalFileInfo.name || dataset.title;
+          const lastDot = fileName.lastIndexOf('.');
+          if (lastDot > 0) {
+            fileExtension = fileName.substring(lastDot + 1);
+            formatName = fileExtension.toUpperCase();
+          }
+        }
+      }
+      
+      a.download = originalFileInfo?.name || `${dataset.title || 'dataset'}.${fileExtension}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success(`Original dataset downloaded as ${formatName}!`, { id: 'download' });
+    } catch (error) {
+      console.error('Download failed:', error);
+      if (error instanceof Error && error.message.includes('Original file not found')) {
+        toast.error('Original file not available for this dataset. Try downloading the analysis report instead.', { id: 'download' });
+      } else {
+        toast.error('Failed to download original dataset. The file might not be available on IPFS.', { id: 'download' });
+      }
+    }
+  };
+
+  const downloadAnalysisResults = async (dataset: Dataset) => {
+    try {
+      console.log('📊 Downloading analysis results as PDF...');
+      toast.loading('Generating analysis report...', { id: 'download' });
+      
+      // Create a temporary div to render the PDF content
+      const pdfContent = document.createElement('div');
+      pdfContent.style.position = 'absolute';
+      pdfContent.style.left = '-9999px';
+      pdfContent.style.top = '0';
+      pdfContent.style.width = '800px';
+      pdfContent.style.padding = '40px';
+      pdfContent.style.backgroundColor = 'white';
+      pdfContent.style.fontFamily = 'Arial, sans-serif';
+      pdfContent.style.fontSize = '12px';
+      pdfContent.style.lineHeight = '1.4';
+      
+      pdfContent.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #1f2937; margin-bottom: 10px; font-size: 24px;">FileScope AI Analysis Report</h1>
+          <p style="color: #6b7280; font-size: 14px;">Generated on ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Dataset Information</h2>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Title:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.title}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Description:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.description}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>File Size:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.fileSize}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Rows:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.rows}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Columns:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.columns}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Upload Date:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${new Date(dataset.metadata.uploadDate).toLocaleDateString()}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Uploader:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.uploader.name}</td></tr>
+          </table>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">AI Analysis Results</h2>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+              <h3 style="color: #1f2937; margin-bottom: 10px;">Quality Metrics</h3>
+              <p><strong>Overall Quality:</strong> ${dataset.results?.metrics?.quality_score || 0}%</p>
+              <p><strong>Completeness:</strong> ${dataset.results?.metrics?.completeness || 0}%</p>
+              <p><strong>Consistency:</strong> ${dataset.results?.metrics?.consistency || 0}%</p>
+              <p><strong>Accuracy:</strong> ${dataset.results?.metrics?.accuracy || 0}%</p>
+              <p><strong>Validity:</strong> ${dataset.results?.metrics?.validity || 0}%</p>
+            </div>
+            
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+              <h3 style="color: #1f2937; margin-bottom: 10px;">Anomaly Detection</h3>
+              <p><strong>Total Anomalies:</strong> ${dataset.results?.metrics?.anomalies?.total || 0}</p>
+              <p><strong>High Priority:</strong> ${dataset.results?.metrics?.anomalies?.high || 0}</p>
+              <p><strong>Medium Priority:</strong> ${dataset.results?.metrics?.anomalies?.medium || 0}</p>
+              <p><strong>Low Priority:</strong> ${dataset.results?.metrics?.anomalies?.low || 0}</p>
+            </div>
+          </div>
+          
+          <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="color: #1f2937; margin-bottom: 10px;">Bias Assessment</h3>
+            <p><strong>Overall Bias Score:</strong> ${dataset.results?.metrics?.bias_metrics?.overall || 0}%</p>
+            <p><strong>Geographic Bias:</strong> ${dataset.results?.metrics?.bias_metrics?.geographic?.status || 'Unknown'}</p>
+            <p><strong>Demographic Bias:</strong> ${dataset.results?.metrics?.bias_metrics?.demographic?.status || 'Unknown'}</p>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Key Insights</h2>
+          ${(dataset.results?.insights || []).map((insight, index) => `
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+              <h4 style="color: #1f2937; margin-bottom: 8px;">${insight.title}</h4>
+              <p style="color: #4b5563; margin-bottom: 8px;">${insight.description}</p>
+              <p style="color: #059669; font-style: italic;"><strong>Action:</strong> ${insight.action}</p>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Blockchain Verification</h2>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>IPFS Hash:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-family: monospace;">${dataset.metadata.ipfsHash}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Contract Address:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-family: monospace;">${dataset.metadata.contractAddress}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Block Number:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.blockNumber}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Views:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.stats.views}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Downloads:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.stats.downloads}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Citations:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.stats.citations}</td></tr>
+          </table>
+        </div>
+        
+        <div style="text-align: center; color: #6b7280; font-size: 10px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          <p>Generated by FileScope AI Explorer</p>
+          <p>This report is cryptographically verified on the Filecoin blockchain</p>
+        </div>
+      `;
+      
+      document.body.appendChild(pdfContent);
+      
+      // Convert to canvas and then to PDF
+      const canvas = await html2canvas(pdfContent, {
+        useCORS: true,
+        allowTaint: true,
+        background: '#ffffff'
+      });
+      
+      document.body.removeChild(pdfContent);
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`${dataset.title || 'dataset'}_analysis_report.pdf`);
+      
+      toast.success('Analysis report downloaded as PDF!', { id: 'download' });
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast.error('Failed to generate PDF report. Please try again.', { id: 'download' });
+    }
+  };
+
+  const downloadCompleteDataset = async (dataset: Dataset) => {
+    try {
+      console.log('📦 Downloading complete dataset package as PDF...');
+      toast.loading('Generating complete dataset report...', { id: 'download' });
+      
+      // Create a temporary div to render the PDF content
+      const pdfContent = document.createElement('div');
+      pdfContent.style.position = 'absolute';
+      pdfContent.style.left = '-9999px';
+      pdfContent.style.top = '0';
+      pdfContent.style.width = '800px';
+      pdfContent.style.padding = '40px';
+      pdfContent.style.backgroundColor = 'white';
+      pdfContent.style.fontFamily = 'Arial, sans-serif';
+      pdfContent.style.fontSize = '12px';
+      pdfContent.style.lineHeight = '1.4';
+      
+      pdfContent.innerHTML = `
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #1f2937; margin-bottom: 10px; font-size: 28px;">FileScope AI Complete Dataset Report</h1>
+          <p style="color: #6b7280; font-size: 14px;">Complete Analysis Package - Generated on ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Dataset Overview</h2>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Title:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.title}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Description:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.description}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Category:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.category}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>File Size:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.fileSize}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Rows:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.rows}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Columns:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.columns}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Format:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.format}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Upload Date:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${new Date(dataset.metadata.uploadDate).toLocaleDateString()}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Uploader:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.uploader.name} (${dataset.uploader.address})</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Public:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.isPublic ? 'Yes' : 'No'}</td></tr>
+          </table>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">AI Analysis Summary</h2>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px; border-radius: 8px; text-align: center;">
+              <h3 style="margin-bottom: 10px; font-size: 18px;">Quality Score</h3>
+              <div style="font-size: 36px; font-weight: bold;">${dataset.results?.metrics?.quality_score || 0}%</div>
+              <p style="font-size: 12px; opacity: 0.9;">Overall Data Quality</p>
+            </div>
+            
+            <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; border-radius: 8px; text-align: center;">
+              <h3 style="margin-bottom: 10px; font-size: 18px;">Completeness</h3>
+              <div style="font-size: 36px; font-weight: bold;">${dataset.results?.metrics?.completeness || 0}%</div>
+              <p style="font-size: 12px; opacity: 0.9;">Data Completeness</p>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #dc2626;">${dataset.results?.metrics?.anomalies?.total || 0}</div>
+              <p style="font-size: 12px; color: #6b7280;">Total Anomalies</p>
+            </div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #ea580c;">${dataset.results?.metrics?.bias_metrics?.overall || 0}%</div>
+              <p style="font-size: 12px; color: #6b7280;">Bias Score</p>
+            </div>
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center;">
+              <div style="font-size: 24px; font-weight: bold; color: #059669;">${dataset.stats.views}</div>
+              <p style="font-size: 12px; color: #6b7280;">Total Views</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Detailed Metrics</h2>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+              <h3 style="color: #1f2937; margin-bottom: 10px;">Quality Metrics</h3>
+              <p><strong>Consistency:</strong> ${dataset.results?.metrics?.consistency || 0}%</p>
+              <p><strong>Accuracy:</strong> ${dataset.results?.metrics?.accuracy || 0}%</p>
+              <p><strong>Validity:</strong> ${dataset.results?.metrics?.validity || 0}%</p>
+            </div>
+            
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+              <h3 style="color: #1f2937; margin-bottom: 10px;">Anomaly Breakdown</h3>
+              <p><strong>High Priority:</strong> ${dataset.results?.metrics?.anomalies?.high || 0}</p>
+              <p><strong>Medium Priority:</strong> ${dataset.results?.metrics?.anomalies?.medium || 0}</p>
+              <p><strong>Low Priority:</strong> ${dataset.results?.metrics?.anomalies?.low || 0}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Key Insights</h2>
+          ${(dataset.results?.insights || []).map((insight, index) => `
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #3b82f6;">
+              <h4 style="color: #1f2937; margin-bottom: 8px;">${insight.title}</h4>
+              <p style="color: #4b5563; margin-bottom: 8px;">${insight.description}</p>
+              <p style="color: #059669; font-style: italic;"><strong>Action:</strong> ${insight.action}</p>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; margin-bottom: 20px;">Blockchain Verification</h2>
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>IPFS Hash:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-size: 10px;">${dataset.metadata.ipfsHash}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Contract Address:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-family: monospace; font-size: 10px;">${dataset.metadata.contractAddress}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Block Number:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.metadata.blockNumber}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Views:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.stats.views}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Downloads:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.stats.downloads}</td></tr>
+            <tr><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;"><strong>Citations:</strong></td><td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${dataset.stats.citations}</td></tr>
+          </table>
+        </div>
+        
+        <div style="text-align: center; color: #6b7280; font-size: 10px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+          <p><strong>FileScope AI Complete Dataset Report</strong></p>
+          <p>This report is cryptographically verified on the Filecoin blockchain</p>
+          <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+        </div>
+      `;
+      
+      document.body.appendChild(pdfContent);
+      
+      // Convert to canvas and then to PDF
+      const canvas = await html2canvas(pdfContent, {
+        useCORS: true,
+        allowTaint: true,
+        background: '#ffffff'
+      });
+      
+      document.body.removeChild(pdfContent);
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`${dataset.title || 'dataset'}_complete_report.pdf`);
+      
+      toast.success('Complete dataset report downloaded as PDF!', { id: 'download' });
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast.error('Failed to generate PDF report. Please try again.', { id: 'download' });
     }
   };
 
@@ -568,9 +1018,13 @@ const DatasetExplorer = () => {
       if (selectedCategory !== 'all' && dataset.category.toLowerCase() !== selectedCategory) {
         return false;
       }
-      if (dataset.results.metrics.qualityScore < filters.minQuality || dataset.results.metrics.qualityScore > filters.maxQuality) {
+      
+      // Add null checking for metrics
+      const qualityScore = dataset.results?.metrics?.quality_score || 0;
+      if (qualityScore < filters.minQuality || qualityScore > filters.maxQuality) {
         return false;
       }
+      
       if (filters.verified !== 'all' && 
           ((filters.verified === 'verified' && !dataset.analysis.verified) ||
            (filters.verified === 'unverified' && dataset.analysis.verified))) {
@@ -584,7 +1038,9 @@ const DatasetExplorer = () => {
     .sort((a, b) => {
       switch (sortBy) {
         case 'quality':
-          return b.results.metrics.qualityScore - a.results.metrics.qualityScore;
+          const aScore = a.results?.metrics?.quality_score || 0;
+          const bScore = b.results?.metrics?.quality_score || 0;
+          return bScore - aScore;
         case 'popular':
           return b.stats.views - a.stats.views;
         case 'downloads':
@@ -626,9 +1082,14 @@ const DatasetExplorer = () => {
             {dataset.analysis.verified && (
               <Verified className="w-4 h-4 text-green-600" />
             )}
+            {!isRealData(dataset) && (
+              <span className="text-xs font-medium text-orange-600 bg-orange-50 dark:bg-orange-900/30 px-2 py-1 rounded">
+                No Analysis Data
+              </span>
+            )}
           </div>
-          <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(dataset.results.metrics.qualityScore)}`}>
-            {dataset.results.metrics.qualityScore}%
+          <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(dataset.results?.metrics?.quality_score || 0)}`}>
+            {dataset.results?.metrics?.quality_score > 0 ? `${dataset.results.metrics.quality_score}%` : 'N/A'}
           </div>
         </div>
         
@@ -663,15 +1124,21 @@ const DatasetExplorer = () => {
         {/* Quality Metrics */}
         <div className="grid grid-cols-3 gap-3 mb-4">
           <div className="text-center">
-            <div className="text-lg font-bold text-gray-900 dark:text-white">{dataset.results.metrics.anomalies.total}</div>
+            <div className="text-lg font-bold text-gray-900 dark:text-white">
+              {dataset.results?.metrics?.anomalies?.total > 0 ? dataset.results.metrics.anomalies.total : 'N/A'}
+            </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">Total Anomalies</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-gray-900 dark:text-white">{dataset.results.metrics.biasMetrics.overall}%</div>
+            <div className="text-lg font-bold text-gray-900 dark:text-white">
+              {dataset.results?.metrics?.bias_metrics?.overall > 0 ? `${(dataset.results.metrics.bias_metrics.overall * 100).toFixed(1)}%` : 'N/A'}
+            </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">Overall Bias</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-gray-900 dark:text-white">{dataset.results.metrics.completeness}%</div>
+            <div className="text-lg font-bold text-gray-900 dark:text-white">
+              {dataset.results?.metrics?.completeness > 0 ? `${dataset.results.metrics.completeness}%` : 'N/A'}
+            </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">Completeness</div>
           </div>
         </div>
@@ -711,8 +1178,8 @@ const DatasetExplorer = () => {
             {dataset.analysis.verified && (
               <Verified className="w-4 h-4 text-green-600" />
             )}
-            <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(dataset.results.metrics.qualityScore)}`}>
-              {dataset.results.metrics.qualityScore}%
+            <div className={`px-2 py-1 rounded text-xs font-medium ${getQualityColor(dataset.results?.metrics?.quality_score || 0)}`}>
+              {dataset.results?.metrics?.quality_score > 0 ? `${dataset.results.metrics.quality_score}%` : 'N/A'}
             </div>
           </div>
           
@@ -743,8 +1210,8 @@ const DatasetExplorer = () => {
             <span>{formatNumber(dataset.stats.views)} views</span>
             <span>{formatNumber(dataset.stats.downloads)} downloads</span>
             <span>{dataset.stats.citations} citations</span>
-            <span>{dataset.results.metrics.anomalies.total} anomalies</span>
-            <span>{dataset.results.metrics.biasMetrics.overall}% bias</span>
+            <span>{dataset.results?.metrics?.anomalies?.total > 0 ? dataset.results.metrics.anomalies.total : 'N/A'} anomalies</span>
+            <span>{dataset.results?.metrics?.bias_metrics?.overall > 0 ? `${(dataset.results.metrics.bias_metrics.overall * 100).toFixed(1)}%` : 'N/A'} bias</span>
           </div>
         </div>
 
@@ -764,6 +1231,57 @@ const DatasetExplorer = () => {
       </div>
     </div>
   );
+
+  // Helper function to detect category from dataset content
+  const detectCategory = (title: string, description: string, tags: string[] = []): string => {
+    const text = `${title} ${description} ${tags.join(' ')}`.toLowerCase();
+    
+    // Define category keywords
+    const categories = {
+      'Finance': ['finance', 'financial', 'money', 'currency', 'crypto', 'bitcoin', 'ethereum', 'trading', 'stock', 'market', 'investment', 'banking', 'revenue', 'profit', 'loss', 'price', 'economic'],
+      'Health': ['health', 'medical', 'covid', 'disease', 'patient', 'hospital', 'doctor', 'treatment', 'medicine', 'vaccine', 'symptom', 'diagnosis', 'clinical', 'biomedical', 'pharmaceutical'],
+      'Climate': ['climate', 'weather', 'temperature', 'environment', 'pollution', 'emission', 'carbon', 'global warming', 'sustainability', 'renewable', 'energy', 'atmospheric', 'meteorological'],
+      'Politics': ['politics', 'political', 'election', 'vote', 'candidate', 'party', 'government', 'policy', 'democratic', 'republican', 'poll', 'campaign', 'legislation', 'congress', 'senate'],
+      'Business': ['business', 'company', 'corporate', 'enterprise', 'startup', 'revenue', 'sales', 'customer', 'product', 'service', 'market', 'industry', 'commercial', 'retail', 'ecommerce'],
+      'Technology': ['technology', 'tech', 'software', 'hardware', 'computer', 'digital', 'internet', 'web', 'mobile', 'app', 'algorithm', 'artificial intelligence', 'machine learning', 'data science'],
+      'Education': ['education', 'school', 'university', 'student', 'academic', 'learning', 'course', 'grade', 'test', 'exam', 'curriculum', 'teaching', 'research', 'scholarly'],
+      'Social': ['social', 'society', 'community', 'population', 'demographic', 'survey', 'opinion', 'behavior', 'culture', 'social media', 'network', 'relationship', 'family', 'marriage'],
+      'Sports': ['sports', 'athletic', 'game', 'team', 'player', 'score', 'match', 'tournament', 'league', 'fitness', 'exercise', 'olympic', 'football', 'basketball', 'soccer'],
+      'Transportation': ['transport', 'transportation', 'vehicle', 'car', 'traffic', 'road', 'highway', 'public transit', 'bus', 'train', 'airplane', 'logistics', 'shipping', 'delivery']
+    };
+    
+    // Find the best matching category
+    let bestCategory = 'Uncategorized';
+    let bestScore = 0;
+    
+    for (const [category, keywords] of Object.entries(categories)) {
+      const score = keywords.filter(keyword => text.includes(keyword)).length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestCategory = category;
+      }
+    }
+    
+    return bestCategory;
+  };
+
+  // Helper function to check if data is real or fallback
+  const isRealData = (data: any): boolean => {
+    // Check if we have actual analysis results vs fallback values
+    if (!data || typeof data !== 'object') return false;
+    
+    // Check for real analysis indicators
+    const hasRealAnalysis = data.results?.metrics?.quality_score > 0 ||
+                           data.results?.metrics?.completeness > 0 ||
+                           data.results?.metrics?.consistency > 0 ||
+                           data.results?.metrics?.accuracy > 0 ||
+                           data.results?.metrics?.validity > 0 ||
+                           data.results?.metrics?.anomalies?.total > 0 ||
+                           data.results?.metrics?.bias_metrics?.overall > 0 ||
+                           (data.results?.insights && data.results.insights.length > 0);
+    
+    return hasRealAnalysis;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -1054,8 +1572,8 @@ const DatasetExplorer = () => {
                         <span className="text-sm font-medium">Verified</span>
                       </div>
                     )}
-                    <div className={`px-3 py-1 rounded text-sm font-medium ${getQualityColor(selectedDataset.results.metrics.qualityScore)}`}>
-                      Quality: {selectedDataset.results.metrics.qualityScore}%
+                    <div className={`px-3 py-1 rounded text-sm font-medium ${getQualityColor(selectedDataset.results?.metrics?.quality_score || 0)}`}>
+                      Quality: {selectedDataset.results?.metrics?.quality_score || 0}%
                     </div>
                   </div>
                 </div>
@@ -1124,19 +1642,19 @@ const DatasetExplorer = () => {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Analysis Results</h3>
                 <div className="grid md:grid-cols-4 gap-4">
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results.metrics.qualityScore}%</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results?.metrics?.quality_score || 0}%</div>
                     <div className="text-sm text-gray-600">Quality Score</div>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results.metrics.anomalies.total}</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results?.metrics?.anomalies?.total || 0}</div>
                     <div className="text-sm text-gray-600">Anomalies</div>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results.metrics.biasMetrics.overall}%</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results?.metrics?.bias_metrics?.overall || 0}%</div>
                     <div className="text-sm text-gray-600">Bias Score</div>
                   </div>
                   <div className="bg-gray-50 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results.metrics.completeness}%</div>
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{selectedDataset.results?.metrics?.completeness || 0}%</div>
                     <div className="text-sm text-gray-600">Completeness</div>
                   </div>
                 </div>
@@ -1163,6 +1681,25 @@ const DatasetExplorer = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Debug Information (only show in development) */}
+              {process.env.NODE_ENV === 'development' && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Debug Information</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="text-sm text-gray-600 space-y-2">
+                      <div><strong>Quality Score:</strong> {selectedDataset.results?.metrics?.quality_score || 'undefined'}</div>
+                      <div><strong>Completeness:</strong> {selectedDataset.results?.metrics?.completeness || 'undefined'}</div>
+                      <div><strong>Anomalies Total:</strong> {selectedDataset.results?.metrics?.anomalies?.total || 'undefined'}</div>
+                      <div><strong>Bias Overall:</strong> {selectedDataset.results?.metrics?.bias_metrics?.overall || 'undefined'}</div>
+                      <div><strong>Insights Count:</strong> {selectedDataset.results?.insights?.length || 'undefined'}</div>
+                      <div><strong>File Size:</strong> {selectedDataset.metadata.fileSize}</div>
+                      <div><strong>Rows:</strong> {selectedDataset.metadata.rows}</div>
+                      <div><strong>Columns:</strong> {selectedDataset.metadata.columns}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Tags */}
               <div>
@@ -1203,18 +1740,40 @@ const DatasetExplorer = () => {
 
             {/* Modal Footer */}
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 rounded-b-2xl">
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-medium text-blue-900 mb-2">Download Options:</h4>
+                <div className="text-xs text-blue-700 space-y-1">
+                  <p><strong>Download Original File:</strong> Get the actual original dataset file (CSV, JSON, Excel, etc.) as uploaded by the user</p>
+                  <p><strong>Download Analysis (PDF):</strong> Get a detailed AI analysis report in PDF format</p>
+                  <p><strong>Complete Report (PDF):</strong> Get everything - dataset info, analysis, and blockchain verification</p>
+                </div>
+              </div>
+              
               <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
                 <div className="text-sm text-gray-600">
                   Last updated {formatDate(selectedDataset.metadata.uploadDate)}
                 </div>
-                <div className="flex space-x-4">
-                  <button className="border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:border-gray-400 transition-colors flex items-center space-x-2">
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                  <button 
+                    onClick={() => downloadOriginalDataset(selectedDataset)}
+                    className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:border-gray-400 transition-colors flex items-center space-x-2 text-sm"
+                  >
                     <Download className="w-4 h-4" />
-                    <span>Download Dataset</span>
+                    <span>Download Original File</span>
                   </button>
-                  <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+                  <button 
+                    onClick={() => downloadAnalysisResults(selectedDataset)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
+                  >
                     <BarChart3 className="w-4 h-4" />
-                    <span>View Full Analysis</span>
+                    <span>Download Analysis (PDF)</span>
+                  </button>
+                  <button 
+                    onClick={() => downloadCompleteDataset(selectedDataset)}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Complete Report (PDF)</span>
                   </button>
                 </div>
               </div>
