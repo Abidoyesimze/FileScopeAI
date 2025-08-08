@@ -1603,40 +1603,43 @@ const DatasetExplorer = () => {
                   <div className="space-y-4">
                     <div className="flex justify-between">
                       <span className="text-gray-600">File Size:</span>
-                      <span className="font-medium">{selectedDataset.metadata.fileSize}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{selectedDataset.metadata.fileSize}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Rows:</span>
-                      <span className="font-medium">{formatNumber(selectedDataset.metadata.rows)}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{formatNumber(selectedDataset.metadata.rows)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Columns:</span>
-                      <span className="font-medium">{selectedDataset.metadata.columns}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{selectedDataset.metadata.columns}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Format:</span>
-                      <span className="font-medium">{selectedDataset.metadata.format}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{selectedDataset.metadata.format}</span>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Views:</span>
-                      <span className="font-medium">{formatNumber(selectedDataset.stats.views)}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{formatNumber(selectedDataset.stats.views)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Downloads:</span>
-                      <span className="font-medium">{formatNumber(selectedDataset.stats.downloads)}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{formatNumber(selectedDataset.stats.downloads)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Citations:</span>
-                      <span className="font-medium">{selectedDataset.stats.citations}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{selectedDataset.stats.citations}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Upload Date:</span>
-                      <span className="font-medium">{formatDate(selectedDataset.metadata.uploadDate)}</span>
+                      <span className="font-bold text-black !important" style={{color: '#000000'}}>{formatDate(selectedDataset.metadata.uploadDate)}</span>
                     </div>
                   </div>
                 </div>
+                
+                {/* Debug info - only show in development */}
+                
               </div>
 
               {/* Analysis Results */}
@@ -1684,25 +1687,6 @@ const DatasetExplorer = () => {
                 </div>
               </div>
 
-              {/* Debug Information (only show in development) */}
-              {process.env.NODE_ENV === 'development' && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Debug Information</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div className="text-sm text-gray-600 space-y-2">
-                      <div><strong>Quality Score:</strong> {selectedDataset.results?.metrics?.quality_score || 'undefined'}</div>
-                      <div><strong>Completeness:</strong> {selectedDataset.results?.metrics?.completeness || 'undefined'}</div>
-                      <div><strong>Anomalies Total:</strong> {selectedDataset.results?.metrics?.anomalies?.total || 'undefined'}</div>
-                      <div><strong>Bias Overall:</strong> {selectedDataset.results?.metrics?.bias_metrics?.overall || 'undefined'}</div>
-                      <div><strong>Insights Count:</strong> {selectedDataset.results?.insights?.length || 'undefined'}</div>
-                      <div><strong>File Size:</strong> {selectedDataset.metadata.fileSize}</div>
-                      <div><strong>Rows:</strong> {selectedDataset.metadata.rows}</div>
-                      <div><strong>Columns:</strong> {selectedDataset.metadata.columns}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Tags */}
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Tags</h3>
@@ -1743,8 +1727,8 @@ const DatasetExplorer = () => {
             {/* Modal Footer */}
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-6 rounded-b-2xl">
               <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="text-sm font-medium text-blue-900 mb-2">Download Options:</h4>
-                <div className="text-xs text-blue-700 space-y-1">
+                <h4 className="text-sm font-bold text-blue-900 mb-2" style={{color: '#1e3a8a'}}>Download Options:</h4>
+                <div className="text-sm font-semibold text-blue-900 space-y-1" style={{color: '#1e3a8a'}}>
                   <p><strong>Download Original File:</strong> Get the actual original dataset file (CSV, JSON, Excel, etc.) as uploaded by the user</p>
                   <p><strong>Download Analysis (PDF):</strong> Get a detailed AI analysis report in PDF format</p>
                   <p><strong>Complete Report (PDF):</strong> Get everything - dataset info, analysis, and blockchain verification</p>
@@ -1752,27 +1736,28 @@ const DatasetExplorer = () => {
               </div>
               
               <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm font-semibold text-gray-900" style={{color: '#111827'}}>
                   Last updated {formatDate(selectedDataset.metadata.uploadDate)}
                 </div>
                 <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                   <button 
                     onClick={() => downloadOriginalDataset(selectedDataset)}
-                    className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:border-gray-400 transition-colors flex items-center space-x-2 text-sm"
+                    className="border border-gray-300 text-gray-900 font-semibold px-4 py-2 rounded-lg hover:border-gray-400 transition-colors flex items-center space-x-2 text-sm"
+                    style={{color: '#111827'}}
                   >
                     <Download className="w-4 h-4" />
                     <span>Download Original File</span>
                   </button>
                   <button 
                     onClick={() => downloadAnalysisResults(selectedDataset)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
+                    className="bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
                   >
                     <BarChart3 className="w-4 h-4" />
                     <span>Download Analysis (PDF)</span>
                   </button>
                   <button 
                     onClick={() => downloadCompleteDataset(selectedDataset)}
-                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm"
+                    className="bg-purple-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Complete Report (PDF)</span>
