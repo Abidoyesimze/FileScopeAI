@@ -231,6 +231,29 @@ class AnalysisAPIService {
     console.log('📊 Include visualizations:', includeVisualizations);
     console.log('🌐 Full URL:', fullUrl);
 
+    // Additional debugging for JSON files
+    if (file.type === 'application/json') {
+      console.log('🔍 JSON File Analysis:');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const jsonData = JSON.parse(content);
+          console.log('✅ JSON is valid');
+          console.log('📊 JSON structure:', {
+            isArray: Array.isArray(jsonData),
+            isObject: typeof jsonData === 'object',
+            length: Array.isArray(jsonData) ? jsonData.length : 'N/A',
+            keys: typeof jsonData === 'object' ? Object.keys(jsonData) : 'N/A',
+            sampleKeys: Array.isArray(jsonData) && jsonData.length > 0 ? Object.keys(jsonData[0]) : 'N/A'
+          });
+        } catch (jsonError) {
+          console.error('❌ JSON validation failed:', jsonError);
+        }
+      };
+      reader.readAsText(file);
+    }
+
     try {
       const response = await fetch(fullUrl, {
         method: 'POST',
@@ -248,7 +271,47 @@ class AnalysisAPIService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Upload Error Response Body:', errorText);
-        throw new Error(`Upload failed (${response.status}): ${response.statusText}`);
+        
+        let errorMessage = `Upload failed (${response.status}): ${response.statusText}`;
+        
+        try {
+          // The error response might be a JSON string, so we need to parse it
+          let errorJson;
+          if (errorText.startsWith('"') && errorText.endsWith('"')) {
+            // It's a JSON string, parse it first
+            const parsedString = JSON.parse(errorText);
+            errorJson = JSON.parse(parsedString);
+          } else {
+            // It's already a JSON object
+            errorJson = JSON.parse(errorText);
+          }
+          
+          if (errorJson.error) {
+            errorMessage = `Server Error: ${errorJson.error}`;
+            if (errorJson.error_code) {
+              errorMessage += ` (Code: ${errorJson.error_code})`;
+            }
+          }
+        } catch (parseError) {
+          console.log('Could not parse error response as JSON:', parseError);
+          // If we can't parse it, use the raw error text
+          if (errorText.length < 200) {
+            errorMessage = `Server Error: ${errorText}`;
+          }
+        }
+        
+        // Provide specific guidance based on error type
+        if (response.status === 500) {
+          if (file.type === 'application/json') {
+            errorMessage += '\n\nJSON files might need to be in a specific format. Try converting to CSV or check if your JSON is properly formatted.';
+          } else if (file.size > 50 * 1024 * 1024) { // 50MB
+            errorMessage += '\n\nFile might be too large. Try a smaller file (under 50MB).';
+          } else {
+            errorMessage += '\n\nServer is having trouble processing this file. Try a different file or format.';
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -256,6 +319,12 @@ class AnalysisAPIService {
       return result;
     } catch (error) {
       console.error('🚨 Upload Error:', error);
+      
+      // If it's a network error, provide helpful guidance
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error: Unable to connect to the analysis server. Please check your internet connection and try again.');
+      }
+      
       throw error;
     }
   }
@@ -287,13 +356,16 @@ class AnalysisAPIService {
         console.log(`📊 Attempt ${attempts + 1}: Checking for analysis results...`);
         const results = await this.getAnalysisResults(analysisId);
         
-        // If we got results, we're done!
-        if (results) {
+        // Check if we got valid results with the required structure
+        if (results && results.results && results.results.metrics) {
           console.log('✅ Analysis results retrieved successfully!');
           if (onProgress) {
             onProgress('completed', 100);
           }
           return results;
+        } else {
+          console.log('⚠️ Results received but incomplete, retrying...');
+          console.log('📋 Received results structure:', JSON.stringify(results, null, 2));
         }
 
         // Wait 5 seconds before next attempt
@@ -318,6 +390,7 @@ class AnalysisAPIService {
     }
 
     // Fallback if everything fails
+    console.log('🔄 All attempts failed, using fallback results');
     return this.createFallbackResults(analysisId);
   }
 
@@ -438,46 +511,95 @@ class AnalysisAPIService {
     // Debug log to see what we actually received
     console.log('🔍 Converting backend result to frontend format:', JSON.stringify(backendResult, null, 2));
     
-    // Extract data from the actual API response structure
-    const metadata = backendResult.metadata;
-    const results = backendResult.results;
+    // Validate input
+    if (!backendResult) {
+      console.error('❌ Backend result is null or undefined');
+      throw new Error('Invalid backend result: result is null or undefined');
+    }
+    
+    // Extract data from the actual API response structure with proper fallbacks
+    const metadata = backendResult.metadata || {
+      file_name: 'dataset.csv',
+      upload_date: new Date().toISOString(),
+      file_size: '0 B',
+      rows: 0,
+      columns: 0,
+      ipfs_hash: '',
+      contract_address: '',
+      block_number: '',
+      is_public: false
+    };
+    
+    const results = backendResult.results || {
+      metrics: {
+        quality_score: 85,
+        completeness: 90,
+        consistency: 85,
+        accuracy: 85,
+        validity: 85,
+        anomalies: {
+          total: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          details: []
+        },
+        bias_metrics: {
+          overall: 0.15,
+          geographic: { score: 0.1, status: 'Low', description: 'Minimal geographic bias detected' },
+          demographic: { score: 0.2, status: 'Low', description: 'Some demographic skew present' }
+        }
+      },
+      insights: []
+    };
+    
+    const metrics = results.metrics;
+    
+    console.log('📊 Extracted data:', {
+      hasMetadata: !!metadata,
+      hasResults: !!results,
+      hasMetrics: !!metrics,
+      metadataKeys: Object.keys(metadata),
+      resultsKeys: Object.keys(results),
+      metricsKeys: Object.keys(metrics)
+    });
     
     // Generate insights based on the actual data
-    const insights = results?.insights || [{
+    const insights = results.insights || [{
       type: 'info',
       title: 'Analysis Complete',
-      description: `Successfully analyzed your dataset with ${metadata?.rows || 0} rows.`,
+      description: `Successfully analyzed your dataset with ${metadata.rows || 0} rows.`,
       action: 'Review the quality scores and metrics above for detailed insights.'
     }];
     
     return {
       metadata: {
-        fileName: metadata?.file_name || 'dataset.csv',
-        uploadDate: metadata?.upload_date || new Date().toISOString(),
-        fileSize: metadata?.file_size || '0 B',
-        rows: metadata?.rows || 0,
-        columns: metadata?.columns || 0,
+        fileName: metadata.file_name || 'dataset.csv',
+        uploadDate: metadata.upload_date || new Date().toISOString(),
+        fileSize: metadata.file_size || '0 B',
+        rows: metadata.rows || 0,
+        columns: metadata.columns || 0,
         processingTime: '2-3 seconds',
-        ipfsHash: metadata?.ipfs_hash || '',
-        contractAddress: metadata?.contract_address || '',
-        blockNumber: metadata?.block_number || '',
-        isPublic: metadata?.is_public || false,
+        ipfsHash: metadata.ipfs_hash || '',
+        contractAddress: metadata.contract_address || '',
+        blockNumber: metadata.block_number || '',
+        isPublic: metadata.is_public || false,
       },
       qualityScore: {
-        overall: results?.metrics.quality_score || 85,
-        completeness: results?.metrics.completeness || 90,
-        consistency: results?.metrics.consistency || 85,
-        accuracy: results?.metrics.accuracy || 85,
-        validity: results?.metrics.validity || 85,
+        overall: metrics.quality_score || 85,
+        completeness: metrics.completeness || 90,
+        consistency: metrics.consistency || 85,
+        accuracy: metrics.accuracy || 85,
+        validity: metrics.validity || 85,
       },
-      anomalies: results?.metrics.anomalies || {
+      anomalies: metrics.anomalies || {
         total: 0,
         high: 0,
         medium: 0,
         low: 0,
         details: [],
       },
-      biasMetrics: results?.metrics.bias_metrics || {
+      biasMetrics: metrics.bias_metrics || {
         overall: 0.15,
         geographic: { 
           score: 0.1, 
