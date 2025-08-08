@@ -195,42 +195,42 @@ const DatasetExplorer = () => {
             // Create dataset object
             const dataset: Dataset = {
               id: i + 1, // Use index as ID for now
-              title: ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`, // Use actual filename if available
-              description: ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || `AI-analyzed dataset`, // Remove fake quality score
+              title: ipfsData?.name || ipfsData?.originalFile?.name || ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`, // Use actual filename if available
+              description: ipfsData?.description || ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || `AI-analyzed dataset`, // Remove fake quality score
               category: detectCategory(
-                ipfsData?.metadata?.fileName || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
-                ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || '',
+                ipfsData?.name || ipfsData?.originalFile?.name || ipfsData?.metadata?.fileName || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
+                ipfsData?.description || ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || '',
                 ipfsData?.metadata?.tags || ipfsData?.results?.metadata?.tags || []
               ),
               metadata: {
-                fileName: ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
-                fileSize: ipfsData?.metadata?.fileSize || ipfsData?.metadata?.file_size || ipfsData?.results?.metadata?.fileSize || 'Unknown',
-                rows: ipfsData?.metadata?.rows || ipfsData?.results?.metadata?.rows || 0,
-                columns: ipfsData?.metadata?.columns || ipfsData?.results?.metadata?.columns || 0,
+                fileName: ipfsData?.name || ipfsData?.originalFile?.name || ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
+                fileSize: ipfsData?.originalFile?.size ? `${(ipfsData.originalFile.size / 1024).toFixed(2)} KB` : ipfsData?.metadata?.fileSize || ipfsData?.metadata?.file_size || ipfsData?.results?.metadata?.fileSize || 'Unknown',
+                rows: ipfsData?.results?.metadata?.rows || ipfsData?.metadata?.rows || 0,
+                columns: ipfsData?.results?.metadata?.columns || ipfsData?.metadata?.columns || 0,
                 uploadDate: new Date(Number(contractData.timestamp) * 1000).toISOString(),
                 ipfsHash: contractData.analysisCID,
                 contractAddress: contractData.uploader, // Assuming uploader is contractAddress
                 blockNumber: contractData.timestamp.toString(),
                 isPublic: contractData.isPublic,
-                description: ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || 'No description available',
+                description: ipfsData?.description || ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || 'No description available',
                 tags: ipfsData?.metadata?.tags || ipfsData?.results?.metadata?.tags || [],
-                format: ipfsData?.metadata?.format || ipfsData?.results?.metadata?.format || 'Unknown'
+                format: ipfsData?.originalFile?.type || ipfsData?.metadata?.format || ipfsData?.results?.metadata?.format || 'Unknown'
               },
               results: {
                 metrics: {
-                  quality_score: ipfsData?.results?.metrics?.quality_score || ipfsData?.metrics?.quality_score || 0, // Only use real data
-                  completeness: ipfsData?.results?.metrics?.completeness || ipfsData?.metrics?.completeness || 0, // Only use real data
-                  consistency: ipfsData?.results?.metrics?.consistency || ipfsData?.metrics?.consistency || 0,
-                  accuracy: ipfsData?.results?.metrics?.accuracy || ipfsData?.metrics?.accuracy || 0,
-                  validity: ipfsData?.results?.metrics?.validity || ipfsData?.metrics?.validity || 0,
-                  anomalies: ipfsData?.results?.metrics?.anomalies || ipfsData?.metrics?.anomalies || {
-                    total: 0,
+                  quality_score: ipfsData?.analysis?.qualityScore || ipfsData?.results?.qualityScore?.overall || ipfsData?.results?.metrics?.quality_score || ipfsData?.metrics?.quality_score || 0, // Only use real data
+                  completeness: ipfsData?.analysis?.completeness || ipfsData?.results?.qualityScore?.completeness || ipfsData?.results?.metrics?.completeness || ipfsData?.metrics?.completeness || 0, // Only use real data
+                  consistency: ipfsData?.analysis?.consistency || ipfsData?.results?.qualityScore?.consistency || ipfsData?.results?.metrics?.consistency || ipfsData?.metrics?.consistency || 0,
+                  accuracy: ipfsData?.analysis?.accuracy || ipfsData?.results?.qualityScore?.accuracy || ipfsData?.results?.metrics?.accuracy || ipfsData?.metrics?.accuracy || 0,
+                  validity: ipfsData?.analysis?.validity || ipfsData?.results?.qualityScore?.validity || ipfsData?.results?.metrics?.validity || ipfsData?.metrics?.validity || 0,
+                  anomalies: ipfsData?.results?.anomalies || ipfsData?.results?.metrics?.anomalies || ipfsData?.metrics?.anomalies || {
+                    total: ipfsData?.analysis?.anomalies || 0,
                     high: 0,
                     medium: 0,
                     low: 0,
                     details: []
                   },
-                  bias_metrics: ipfsData?.results?.metrics?.bias_metrics || ipfsData?.metrics?.bias_metrics || {
+                  bias_metrics: ipfsData?.results?.biasMetrics || ipfsData?.results?.metrics?.bias_metrics || ipfsData?.metrics?.bias_metrics || {
                     overall: 0,
                     geographic: { score: 0, status: 'Unknown', description: 'No analysis available' },
                     demographic: { score: 0, status: 'Unknown', description: 'No analysis available' }
@@ -332,6 +332,7 @@ const DatasetExplorer = () => {
   }, [mounted, isConnected, contractDatasets, contractError]);
 
   // Helper function to fetch IPFS data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetchIPFSData = async (cid: string): Promise<any> => {
     try {
       console.log('🔍 Fetching IPFS data from CID:', cid);
@@ -1266,6 +1267,7 @@ const DatasetExplorer = () => {
   };
 
   // Helper function to check if data is real or fallback
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const isRealData = (data: any): boolean => {
     // Check if we have actual analysis results vs fallback values
     if (!data || typeof data !== 'object') return false;
