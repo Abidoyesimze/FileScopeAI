@@ -8,16 +8,13 @@ import {
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { analysisAPI, FrontendAnalysisResult } from '../../services/analysisApi';
+import { analysisAPI } from '../../services/analysisApi';
 import { fileStoreContract } from '../index';
 
 // Pinata IPFS configuration
-const PINATA_JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET || '';
-
-// Check if environment variables are properly configured
-const isEnvironmentConfigured = () => {
-  return PINATA_JWT_SECRET && PINATA_JWT_SECRET !== 'your_jwt_secret_here';
-};
+const PINATA_API_KEY = process.env.NEXT_PUBLIC_PINATA_API_KEY;
+const PINATA_SECRET_API_KEY = process.env.NEXT_PUBLIC_PINATA_SECRET_API_KEY;
+const PINATA_JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET;
 
 interface FilePreview {
   headers: string[];
@@ -37,25 +34,6 @@ interface SampleDataset {
   rows: string;
   description: string;
   type: string;
-}
-
-interface AnalysisStatus {
-  status: 'completed' | 'processing' | 'pending' | 'failed' | 'error';
-  progress?: number;
-  message?: string;
-  analysis_id: string;
-}
-
-// Add proper type for the parsed state
-interface SavedState {
-  currentStep: 'upload' | 'preview' | 'processing';
-  analysisProgress: number;
-  currentAnalysisId: string | number | null;
-  fileName?: string;
-  fileSize?: number;
-  fileType?: string;
-  isPublic: boolean;
-  timestamp?: string;
 }
 
 const FileScopeApp = () => {
@@ -78,7 +56,8 @@ const FileScopeApp = () => {
   const [isPublic, setIsPublic] = useState(false);
 
   // New state for tracking analysis data
-  const [analysisResults, setAnalysisResults] = useState<FrontendAnalysisResult | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [ipfsHash, setIpfsHash] = useState<string | null>(null);
 
   // Wallet connection check
@@ -87,7 +66,7 @@ const FileScopeApp = () => {
   const [mounted, setMounted] = useState(false);
 
   // Blockchain contract write hook
-  const { writeContract, data: blockchainData, error: contractError, reset: resetContract } = useWriteContract();
+  const { writeContract, data: blockchainData, isPending: isBlockchainLoading, error: contractError, reset: resetContract } = useWriteContract();
 
   // Transaction receipt hook for confirmation
   const { data: transactionReceipt, isSuccess: isTransactionConfirmed, error: receiptError } = useWaitForTransactionReceipt({
@@ -142,57 +121,17 @@ const FileScopeApp = () => {
     console.log('💾 Saved state to sessionStorage:', state);
   }, [currentStep, analysisProgress, currentAnalysisId, uploadedFile, isPublic]);
 
-  // IPFS Upload Function using Pinata - Now stores both original file and analysis results
-  const uploadToIPFS = useCallback(async (file: File, analysisResults: FrontendAnalysisResult) => {
+  // IPFS Upload Function using Pinata
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const uploadToIPFS = useCallback(async (file: File, analysisResults: any) => {
     try {
       console.log('🌐 Starting IPFS upload...');
       
-      if (!isEnvironmentConfigured()) {
-        throw new Error('Pinata JWT secret not properly configured. Please check your environment variables.');
-      }
-      
-      // Step 1: Upload the original file to IPFS
-      console.log('📁 Uploading original file to IPFS...');
-      const originalFileFormData = new FormData();
-      originalFileFormData.append('file', file);
-      
-      const originalFileResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${PINATA_JWT_SECRET}`,
-        },
-        body: originalFileFormData,
-      });
-
-      if (!originalFileResponse.ok) {
-        throw new Error(`Original file IPFS upload failed: ${originalFileResponse.statusText}`);
-      }
-
-      const originalFileResult = await originalFileResponse.json();
-      const originalFileHash = originalFileResult.IpfsHash;
-      console.log('✅ Original file uploaded to IPFS:', originalFileHash);
-      
-      // Step 2: Create comprehensive metadata including original file reference
+      // Create metadata for IPFS
       const metadata = {
         name: file.name,
         description: `AI Analysis Results for ${file.name}`,
-        originalFile: {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          ipfsHash: originalFileHash,
-          uploadDate: new Date().toISOString()
-        },
-        analysis: {
-          timestamp: new Date().toISOString(),
-          qualityScore: analysisResults.qualityScore?.overall || 0,
-          anomalies: analysisResults.anomalies?.total || 0,
-          completeness: analysisResults.qualityScore?.completeness || 0,
-          consistency: analysisResults.qualityScore?.consistency || 0,
-          accuracy: analysisResults.qualityScore?.accuracy || 0,
-          validity: analysisResults.qualityScore?.validity || 0
-        },
-        results: analysisResults,
+        image: null,
         attributes: [
           {
             trait_type: "File Type",
@@ -213,45 +152,34 @@ const FileScopeApp = () => {
           {
             trait_type: "Analysis Date",
             value: new Date().toISOString()
-          },
-          {
-            trait_type: "Original File Available",
-            value: "Yes"
           }
         ]
       };
 
-      // Step 3: Upload comprehensive metadata to IPFS
-      console.log('📊 Uploading analysis results to IPFS...');
-      const metadataBlob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
-      const metadataFile = new File([metadataBlob], 'analysis_results.json', { type: 'application/json' });
+      // Upload metadata to IPFS
+      const metadataBlob = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
+      const metadataFile = new File([metadataBlob], 'metadata.json', { type: 'application/json' });
 
-      const analysisFormData = new FormData();
-      analysisFormData.append('file', metadataFile);
+      const formData = new FormData();
+      formData.append('file', metadataFile);
 
-      const analysisResponse = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${PINATA_JWT_SECRET}`,
         },
-        body: analysisFormData,
+        body: formData,
       });
 
-      if (!analysisResponse.ok) {
-        throw new Error(`Analysis results IPFS upload failed: ${analysisResponse.statusText}`);
+      if (!response.ok) {
+        throw new Error(`IPFS upload failed: ${response.statusText}`);
       }
 
-      const analysisResult = await analysisResponse.json();
-      const analysisHash = analysisResult.IpfsHash;
+      const result = await response.json();
+      const hash = result.IpfsHash;
       
-      console.log('✅ Analysis results uploaded to IPFS:', analysisHash);
-      console.log('📋 Summary:');
-      console.log('- Original file hash:', originalFileHash);
-      console.log('- Analysis results hash:', analysisHash);
-      
-      // Return the analysis hash (this is what gets stored on blockchain)
-      // The original file hash is embedded in the analysis results
-      return analysisHash;
+      console.log('✅ IPFS upload successful:', hash);
+      return hash;
     } catch (error) {
       console.error('❌ IPFS upload failed:', error);
       throw new Error(`Failed to upload to IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -276,6 +204,19 @@ const FileScopeApp = () => {
     }
   }, [resetContract]);
 
+  const resetUpload = useCallback(() => {
+    setUploadedFile(null);
+    setFilePreview(null);
+    setError(null);
+    setIsAnalyzing(false);
+    setAnalysisProgress(0);
+    setCurrentAnalysisId(null);
+    setIsPublic(false);
+    setAnalysisResults(null);
+    setIpfsHash(null);
+    resetContract();
+  }, [resetContract]);
+
   // File Upload Functions
   const generatePreview = useCallback((file: File) => {
     const reader = new FileReader();
@@ -291,46 +232,6 @@ const FileScopeApp = () => {
           sampleRows: lines.slice(1, 6).map((row: string) => row.split(',')),
           totalLines: lines.length - 1
         };
-      } else if (file.type === 'application/json') {
-        try {
-          const jsonData = JSON.parse(content);
-          
-          if (Array.isArray(jsonData)) {
-            // Handle array of objects
-            if (jsonData.length > 0 && typeof jsonData[0] === 'object') {
-              const firstItem = jsonData[0];
-              preview = {
-                headers: Object.keys(firstItem),
-                sampleRows: jsonData.slice(0, 5).map((item: Record<string, unknown>) => 
-                  Object.values(item).map((val: unknown) => String(val))
-                ),
-                totalLines: jsonData.length
-              };
-            } else {
-              // Handle simple array
-              preview = {
-                headers: ['value'],
-                sampleRows: jsonData.slice(0, 5).map((item: unknown) => [String(item)]),
-                totalLines: jsonData.length
-              };
-            }
-          } else if (typeof jsonData === 'object') {
-            // Handle object
-            const keys = Object.keys(jsonData);
-            preview = {
-              headers: keys,
-              sampleRows: [Object.values(jsonData).map((val: unknown) => String(val))],
-              totalLines: 1
-            };
-          }
-        } catch (error) {
-          console.error('Error parsing JSON for preview:', error);
-          preview = {
-            headers: ['Error'],
-            sampleRows: [['Could not parse JSON file']],
-            totalLines: 0
-          };
-        }
       }
       
       setFilePreview(preview);
@@ -341,14 +242,6 @@ const FileScopeApp = () => {
 
   const handleFileUpload = useCallback((file: File) => {
     setError(null);
-    
-    // Check if environment is properly configured
-    if (!isEnvironmentConfigured()) {
-      const errorMsg = 'Pinata API keys are not properly configured. Please set up your environment variables to enable file uploads.';
-      setError(errorMsg);
-      toast.error(errorMsg);
-      return;
-    }
     
     if (!supportedTypes[file.type]) {
       const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, or Excel files.`;
@@ -364,39 +257,6 @@ const FileScopeApp = () => {
       return;
     }
 
-    // Additional validation for JSON files
-    if (file.type === 'application/json') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const content = e.target?.result as string;
-          JSON.parse(content); // This will throw if JSON is invalid
-          
-          // Check if it's an array or object
-          const parsed = JSON.parse(content);
-          if (!Array.isArray(parsed) && typeof parsed !== 'object') {
-            setError('JSON file must contain an array or object. Please check your JSON format.');
-            toast.error('Invalid JSON format. File must contain an array or object.');
-            return;
-          }
-          
-          // If JSON is valid, proceed with upload
-          setUploadedFile(file);
-          generatePreview(file);
-          setCurrentStep('preview');
-          toast.success('JSON file validated successfully! Review your data below.');
-        } catch (jsonError) {
-          const errorMsg = 'Invalid JSON format. Please check your file and try again.';
-          setError(errorMsg);
-          toast.error(errorMsg);
-          console.error('JSON validation error:', jsonError);
-        }
-      };
-      reader.readAsText(file);
-      return;
-    }
-
-    // For non-JSON files, proceed normally
     setUploadedFile(file);
     generatePreview(file);
     setCurrentStep('preview');
@@ -452,68 +312,6 @@ const FileScopeApp = () => {
     
     setCurrentStep('preview');
     toast.success(`Using sample dataset: ${dataset.name}`);
-  }, []);
-
-  // Test JSON file validation
-  const testJSONFile = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const jsonData = JSON.parse(content);
-        
-        const analysis = {
-          isValid: true,
-          structure: '',
-          issues: [] as string[],
-          recommendations: [] as string[]
-        };
-        
-        if (Array.isArray(jsonData)) {
-          analysis.structure = 'Array';
-          if (jsonData.length === 0) {
-            analysis.issues.push('Array is empty');
-            analysis.recommendations.push('Add some data to the array');
-          } else if (typeof jsonData[0] === 'object') {
-            analysis.structure += ' of Objects';
-            const keys = Object.keys(jsonData[0]);
-            if (keys.length === 0) {
-              analysis.issues.push('Objects have no properties');
-              analysis.recommendations.push('Add properties to your objects');
-            }
-          }
-        } else if (typeof jsonData === 'object') {
-          analysis.structure = 'Object';
-          const keys = Object.keys(jsonData);
-          if (keys.length === 0) {
-            analysis.issues.push('Object has no properties');
-            analysis.recommendations.push('Add properties to your object');
-          }
-        } else {
-          analysis.isValid = false;
-          analysis.issues.push('Root must be an array or object');
-          analysis.recommendations.push('Wrap your data in an array or object');
-        }
-        
-        // Check for common issues
-        if (content.length > 10 * 1024 * 1024) { // 10MB
-          analysis.issues.push('File is very large');
-          analysis.recommendations.push('Consider using a smaller file or converting to CSV');
-        }
-        
-        if (analysis.isValid && analysis.issues.length === 0) {
-          toast.success('JSON file looks good! Ready for analysis.');
-        } else {
-          const message = `JSON Analysis:\nStructure: ${analysis.structure}\nIssues: ${analysis.issues.join(', ')}\nRecommendations: ${analysis.recommendations.join(', ')}`;
-          toast.error(message, { duration: 10000 });
-        }
-        
-      } catch (error) {
-        toast.error('Invalid JSON format. Please check your file.');
-        console.error('JSON validation error:', error);
-      }
-    };
-    reader.readAsText(file);
   }, []);
 
   const formatFileSize = useCallback((bytes: number) => {
@@ -573,8 +371,6 @@ const FileScopeApp = () => {
           errorMessage = 'Failed to store results on IPFS. Please try again.';
         } else if (error.message.includes('Blockchain') || error.message.includes('Contract')) {
           errorMessage = 'Blockchain registration failed. Please check your wallet and try again.';
-        } else if (error.message.includes('Server Error: Processing failed')) {
-          errorMessage = 'The server is having trouble processing this file. Try:\n\n• Converting your file to CSV format\n• Using a smaller file (under 50MB)\n• Checking if your JSON is properly formatted\n• Using one of our sample datasets';
         } else if (error.message.includes('failed')) {
           const match = error.message.match(/Upload failed \((\d+)\): (.+)/);
           if (match) {
@@ -589,7 +385,7 @@ const FileScopeApp = () => {
         }
       }
       
-      toast.error(errorMessage, { id: 'analysis', duration: 8000 });
+      toast.error(errorMessage, { id: 'analysis' });
       setCurrentStep('preview');
       setIsAnalyzing(false);
       clearSavedState(); // Clear saved state on error
@@ -675,7 +471,7 @@ const FileScopeApp = () => {
     const savedState = sessionStorage.getItem('uploadState');
     if (savedState) {
       try {
-        const parsedState = JSON.parse(savedState) as SavedState;
+        const parsedState = JSON.parse(savedState);
         if (parsedState.currentStep === 'processing') {
           console.log('🔄 Found processing state, attempting to restore...');
           
@@ -692,51 +488,42 @@ const FileScopeApp = () => {
           if (parsedState.currentAnalysisId) {
             console.log('🔍 Checking analysis status for ID:', parsedState.currentAnalysisId);
             
-            // Check if analysis is complete with proper error handling
+            // Check if analysis is complete
             analysisAPI.getAnalysisStatus(String(parsedState.currentAnalysisId))
-              .then((analysisStatus: AnalysisStatus) => {
-                console.log('📊 Analysis status:', analysisStatus);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .then((status: any) => {
+                console.log('📊 Analysis status:', status);
                 
-                if (analysisStatus.status === 'completed') {
+                if (status.status === 'completed') {
                   console.log('🎉 Analysis already completed, processing results...');
-                  // Get the full results
-                  return analysisAPI.getAnalysisResults(parsedState.currentAnalysisId!)
-                    .then((results) => {
-                      const frontendResults = analysisAPI.convertToFrontendFormat(results);
-                      
-                      // Create mock file for results page
-                      const mockFile = new File([''], parsedState.fileName || 'unknown.csv', {
-                        type: parsedState.fileType || 'text/csv'
-                      });
-                      
-                      // Store results and navigate
-                      const resultsData = {
-                        results: frontendResults,
-                        fileName: mockFile.name,
-                        fileSize: parsedState.fileSize || 0,
-                        analysisId: parsedState.currentAnalysisId,
-                        timestamp: new Date().toISOString(),
-                        isPublic: parsedState.isPublic,
-                        ipfsHash: 'restored-' + Date.now(), // Placeholder
-                        blockchainData: {
-                          transactionHash: 'restored',
-                          blockNumber: 'restored',
-                          gasUsed: 'N/A',
-                          status: 'restored'
-                        }
-                      };
-                      
-                      sessionStorage.setItem('analysisResults', JSON.stringify(resultsData));
-                      clearSavedState();
-                      router.push('/results');
-                    })
-                    .catch((error) => {
-                      console.error('❌ Failed to get analysis results:', error);
-                      toast.error('Failed to restore analysis results. Starting fresh.');
-                      clearSavedState();
-                      setCurrentStep('upload');
-                    });
-                } else if (analysisStatus.status === 'failed') {
+                  const frontendResults = analysisAPI.convertToFrontendFormat(status);
+                  
+                  // Create mock file for results page
+                  const mockFile = new File([''], parsedState.fileName || 'unknown.csv', {
+                    type: parsedState.fileType || 'text/csv'
+                  });
+                  
+                  // Store results and navigate
+                  const resultsData = {
+                    results: frontendResults,
+                    fileName: mockFile.name,
+                    fileSize: parsedState.fileSize || 0,
+                    analysisId: parsedState.currentAnalysisId,
+                    timestamp: new Date().toISOString(),
+                    isPublic: parsedState.isPublic || false,
+                    ipfsHash: 'restored-' + Date.now(), // Placeholder
+                    blockchainData: {
+                      transactionHash: 'restored',
+                      blockNumber: 'restored',
+                      gasUsed: 'N/A',
+                      status: 'restored'
+                    }
+                  };
+                  
+                  sessionStorage.setItem('analysisResults', JSON.stringify(resultsData));
+                  clearSavedState();
+                  router.push('/results');
+                } else if (status.status === 'failed' || status.status === 'error') {
                   console.log('❌ Analysis failed, clearing state');
                   toast.error('Previous analysis failed. Please try again.');
                   clearSavedState();
@@ -746,8 +533,7 @@ const FileScopeApp = () => {
                   // Restore the UI state for ongoing analysis
                   setCurrentStep('processing');
                   setAnalysisProgress(parsedState.analysisProgress || 0);
-                  const analysisId = typeof parsedState.currentAnalysisId === 'string' ? parseInt(parsedState.currentAnalysisId) : parsedState.currentAnalysisId;
-                  setCurrentAnalysisId(analysisId);
+                  setCurrentAnalysisId(parsedState.currentAnalysisId);
                   setIsAnalyzing(true);
                   
                   // Restore file data if available
@@ -763,7 +549,7 @@ const FileScopeApp = () => {
                   continueAnalysisMonitoring(String(parsedState.currentAnalysisId));
                 }
               })
-              .catch((error: Error) => {
+              .catch(error => {
                 console.error('❌ Failed to check analysis status:', error);
                 toast.error('Failed to restore previous session. Starting fresh.');
                 clearSavedState();
@@ -780,8 +566,7 @@ const FileScopeApp = () => {
           // Restore other states normally
           setCurrentStep(parsedState.currentStep || 'upload');
           setAnalysisProgress(parsedState.analysisProgress || 0);
-          const analysisId = typeof parsedState.currentAnalysisId === 'string' ? parseInt(parsedState.currentAnalysisId) : parsedState.currentAnalysisId;
-          setCurrentAnalysisId(analysisId);
+          setCurrentAnalysisId(parsedState.currentAnalysisId);
           setIsAnalyzing(false);
           
           if (parsedState.fileName && parsedState.fileSize) {
@@ -798,7 +583,7 @@ const FileScopeApp = () => {
         toast.error('Failed to restore previous session.');
       }
     }
-  }, [router, clearSavedState, continueAnalysisMonitoring]);
+  }, [router, clearSavedState]);
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -1346,23 +1131,6 @@ const FileScopeApp = () => {
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Upload any CSV, JSON, or Excel file to get instant AI-powered analysis with complete transparency on Filecoin
             </p>
-            
-            {/* Environment Configuration Warning */}
-            {!isEnvironmentConfigured() && (
-              <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg max-w-3xl mx-auto">
-                <div className="flex items-center space-x-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-                  <div>
-                    <h4 className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                      Configuration Required
-                    </h4>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                      Pinata API keys are not properly configured. Please set up your environment variables to enable file uploads and IPFS storage.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="grid lg:grid-cols-2 gap-12">
@@ -1411,35 +1179,6 @@ const FileScopeApp = () => {
 
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Maximum file size: 100MB
-                </div>
-                
-                {/* JSON File Requirements */}
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">JSON File Requirements:</h4>
-                  <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                    <li>• Must be valid JSON format</li>
-                    <li>• Should contain an array of objects or a single object</li>
-                    <li>• Each object should have consistent key names</li>
-                    <li>• Avoid deeply nested structures</li>
-                    <li>• Consider converting to CSV for better compatibility</li>
-                  </ul>
-                  <button
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = '.json';
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) {
-                          testJSONFile(file);
-                        }
-                      };
-                      input.click();
-                    }}
-                    className="mt-3 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors"
-                  >
-                    Test JSON File
-                  </button>
                 </div>
               </div>
 
