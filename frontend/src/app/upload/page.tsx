@@ -14,6 +14,11 @@ import { fileStoreContract } from '../index';
 // Pinata IPFS configuration
 const PINATA_JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET || '';
 
+// Check if environment variables are properly configured
+const isEnvironmentConfigured = () => {
+  return PINATA_JWT_SECRET && PINATA_JWT_SECRET !== 'your_jwt_secret_here';
+};
+
 interface FilePreview {
   headers: string[];
   sampleRows: string[][];
@@ -142,8 +147,8 @@ const FileScopeApp = () => {
     try {
       console.log('🌐 Starting IPFS upload...');
       
-      if (!PINATA_JWT_SECRET) {
-        throw new Error('Pinata JWT secret not configured');
+      if (!isEnvironmentConfigured()) {
+        throw new Error('Pinata JWT secret not properly configured. Please check your environment variables.');
       }
       
       // Step 1: Upload the original file to IPFS
@@ -296,8 +301,8 @@ const FileScopeApp = () => {
               const firstItem = jsonData[0];
               preview = {
                 headers: Object.keys(firstItem),
-                sampleRows: jsonData.slice(0, 5).map((item: any) => 
-                  Object.values(item).map((val: any) => String(val))
+                sampleRows: jsonData.slice(0, 5).map((item: Record<string, unknown>) => 
+                  Object.values(item).map((val: unknown) => String(val))
                 ),
                 totalLines: jsonData.length
               };
@@ -305,7 +310,7 @@ const FileScopeApp = () => {
               // Handle simple array
               preview = {
                 headers: ['value'],
-                sampleRows: jsonData.slice(0, 5).map((item: any) => [String(item)]),
+                sampleRows: jsonData.slice(0, 5).map((item: unknown) => [String(item)]),
                 totalLines: jsonData.length
               };
             }
@@ -314,7 +319,7 @@ const FileScopeApp = () => {
             const keys = Object.keys(jsonData);
             preview = {
               headers: keys,
-              sampleRows: [Object.values(jsonData).map((val: any) => String(val))],
+              sampleRows: [Object.values(jsonData).map((val: unknown) => String(val))],
               totalLines: 1
             };
           }
@@ -336,6 +341,14 @@ const FileScopeApp = () => {
 
   const handleFileUpload = useCallback((file: File) => {
     setError(null);
+    
+    // Check if environment is properly configured
+    if (!isEnvironmentConfigured()) {
+      const errorMsg = 'Pinata API keys are not properly configured. Please set up your environment variables to enable file uploads.';
+      setError(errorMsg);
+      toast.error(errorMsg);
+      return;
+    }
     
     if (!supportedTypes[file.type]) {
       const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, or Excel files.`;
@@ -449,7 +462,7 @@ const FileScopeApp = () => {
         const content = e.target?.result as string;
         const jsonData = JSON.parse(content);
         
-        let analysis = {
+        const analysis = {
           isValid: true,
           structure: '',
           issues: [] as string[],
@@ -679,7 +692,7 @@ const FileScopeApp = () => {
           if (parsedState.currentAnalysisId) {
             console.log('🔍 Checking analysis status for ID:', parsedState.currentAnalysisId);
             
-            // Check if analysis is complete
+            // Check if analysis is complete with proper error handling
             analysisAPI.getAnalysisStatus(String(parsedState.currentAnalysisId))
               .then((analysisStatus: AnalysisStatus) => {
                 console.log('📊 Analysis status:', analysisStatus);
@@ -716,6 +729,12 @@ const FileScopeApp = () => {
                       sessionStorage.setItem('analysisResults', JSON.stringify(resultsData));
                       clearSavedState();
                       router.push('/results');
+                    })
+                    .catch((error) => {
+                      console.error('❌ Failed to get analysis results:', error);
+                      toast.error('Failed to restore analysis results. Starting fresh.');
+                      clearSavedState();
+                      setCurrentStep('upload');
                     });
                 } else if (analysisStatus.status === 'failed') {
                   console.log('❌ Analysis failed, clearing state');
@@ -779,7 +798,7 @@ const FileScopeApp = () => {
         toast.error('Failed to restore previous session.');
       }
     }
-  }, [router, clearSavedState]);
+  }, [router, clearSavedState, continueAnalysisMonitoring]);
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -1327,6 +1346,23 @@ const FileScopeApp = () => {
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Upload any CSV, JSON, or Excel file to get instant AI-powered analysis with complete transparency on Filecoin
             </p>
+            
+            {/* Environment Configuration Warning */}
+            {!isEnvironmentConfigured() && (
+              <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg max-w-3xl mx-auto">
+                <div className="flex items-center space-x-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
+                      Configuration Required
+                    </h4>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      Pinata API keys are not properly configured. Please set up your environment variables to enable file uploads and IPFS storage.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-2 gap-12">
