@@ -1596,26 +1596,46 @@ const DatasetExplorer = () => {
                 <p className="text-gray-600 leading-relaxed">{selectedDataset.description}</p>
               </div>
 
-              {/* Metadata Grid */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Dataset Information</h3>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">File Size:</span>
-                      <span className="font-medium">{selectedDataset.metadata.fileSize}</span>
+                {/* Metadata Grid */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Dataset Information</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">File Size:</span>
+                        <span className="font-medium text-gray-600">{selectedDataset.metadata.size}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Rows:</span>
+                        <span className="font-medium text-gray-600">{formatNumber(selectedDataset.metadata.rows)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Columns:</span>
+                        <span className="font-medium text-gray-600">{selectedDataset.metadata.columns}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Format:</span>
+                        <span className="font-medium text-gray-600">{selectedDataset.metadata.format}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Rows:</span>
-                      <span className="font-medium">{formatNumber(selectedDataset.metadata.rows)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Columns:</span>
-                      <span className="font-medium">{selectedDataset.metadata.columns}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Format:</span>
-                      <span className="font-medium">{selectedDataset.metadata.format}</span>
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Views:</span>
+                        <span className="font-medium text-gray-600">{formatNumber(selectedDataset.stats.views)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Downloads:</span>
+                        <span className="font-medium text-gray-600">{formatNumber(selectedDataset.stats.downloads)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Citations:</span>
+                        <span className="font-medium text-gray-600">{selectedDataset.stats.citations}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Upload Date:</span>
+                        <span className="font-medium text-gray-600">{formatDate(selectedDataset.metadata.uploadDate)}</span>
+                      </div>
+
                     </div>
                   </div>
                   <div className="space-y-4">
