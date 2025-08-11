@@ -79,8 +79,6 @@ const FileScopeApp = () => {
     'text/csv': { icon: FileSpreadsheet, label: 'CSV', color: 'green' },
     'application/json': { icon: Code, label: 'JSON', color: 'blue' },
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { icon: FileText, label: 'XLSX', color: 'orange' },
-    'application/msword': { icon: FileText, label: 'DOC', color: 'purple' },
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { icon: FileText, label: 'DOCX', color: 'purple' },
     'text/plain': { icon: FileText, label: 'TXT', color: 'gray' }
   }), []);
 
@@ -247,7 +245,7 @@ const FileScopeApp = () => {
     setError(null);
     
     if (!supportedTypes[file.type]) {
-      const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, Excel, Word, or text files.`;
+      const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, Excel, or text files.`;
       setError(errorMsg);
       toast.error(errorMsg);
       return;
@@ -1137,7 +1135,7 @@ const FileScopeApp = () => {
             </div>
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Upload Your Dataset</h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Upload any CSV, JSON, Excel, Word, or text file to get instant AI-powered analysis with complete transparency on Filecoin
+              Upload any CSV, JSON, Excel, or text file to get instant AI-powered analysis with complete transparency on Filecoin
             </p>
           </div>
 
@@ -1171,7 +1169,7 @@ const FileScopeApp = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.json,.xlsx,.xls,.doc,.docx,.txt"
+                  accept=".csv,.json,.xlsx,.xls,.txt"
                   onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
                   className="hidden"
                 />
