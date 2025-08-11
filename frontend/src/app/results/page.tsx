@@ -56,6 +56,44 @@ interface StoredAnalysisData {
       description: string;
       action: string;
     }>;
+    // New enhanced API response fields
+    dataset_info?: {
+      original_filename: string;
+      rows: number;
+      columns: number;
+      size_bytes: number;
+      file_type: string;
+      actual_content_type: string;
+      extension_mismatch: boolean;
+      column_names: string[];
+      column_types: Record<string, string>;
+      memory_usage_mb: number;
+      has_missing_values: boolean;
+      missing_percentage: number;
+    };
+    file_health?: {
+      structure_score: number;
+      issues_detected: number;
+      format_mismatch: boolean;
+      can_analyze: boolean;
+    };
+    file_structure_analysis?: {
+      issues_found: number;
+      extension_mismatch: boolean;
+      actual_content_type: string;
+      issues_by_severity: {
+        high: number;
+        medium: number;
+        low: number;
+        info: number;
+      };
+      detailed_issues: Array<{
+        type: string;
+        severity: string;
+        message: string;
+        recommendation: string;
+      }>;
+    };
   };
   fileName: string;
   fileSize: number;
@@ -107,6 +145,26 @@ const ResultsPage = () => {
         
         const parsedData: StoredAnalysisData = JSON.parse(storedData);
         console.log('📊 Loaded analysis results:', parsedData);
+        
+        // Log the full response structure to see what we're getting
+        console.log('🔍 Full API Response Structure:');
+        console.log('- Has dataset_info:', !!parsedData.results?.dataset_info);
+        console.log('- Has file_health:', !!parsedData.results?.file_health);
+        console.log('- Has file_structure_analysis:', !!parsedData.results?.file_structure_analysis);
+        
+        if (parsedData.results?.dataset_info) {
+          console.log('📁 Dataset Info:', parsedData.results.dataset_info);
+        }
+        if (parsedData.results?.file_health) {
+          console.log('🏥 File Health:', parsedData.results.file_health);
+        }
+        if (parsedData.results?.file_structure_analysis) {
+          console.log('🔧 File Structure Analysis:', parsedData.results.file_structure_analysis);
+        }
+        
+        // Log the complete results object
+        console.log('📋 Complete Results Object:', parsedData.results);
+        
         setAnalysisData(parsedData);
         setLoading(false);
         
@@ -551,6 +609,164 @@ const ResultsPage = () => {
             <p className="text-gray-600 dark:text-gray-400 text-sm">{results.metadata.columns} columns</p>
           </div>
         </div>
+
+        {/* Enhanced API Response Cards */}
+        {(results.dataset_info || results.file_health || results.file_structure_analysis) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Dataset Information Card */}
+            {results.dataset_info && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                    <Info className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Dataset Information</h3>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Original Filename:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{results.dataset_info.original_filename}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">File Type:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{results.dataset_info.file_type}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Actual Content:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{results.dataset_info.actual_content_type}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Memory Usage:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{results.dataset_info.memory_usage_mb.toFixed(2)} MB</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Missing Values:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {results.dataset_info.has_missing_values ? `${results.dataset_info.missing_percentage.toFixed(1)}%` : 'None'}
+                    </span>
+                  </div>
+                  {results.dataset_info.extension_mismatch && (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                        <span className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                          Extension mismatch detected
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* File Health Card */}
+            {results.file_health && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-green-50 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">File Health</h3>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Structure Score:</span>
+                    <span className={`font-medium ${getScoreColor(results.file_health.structure_score)}`}>
+                      {results.file_health.structure_score}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Issues Detected:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{results.file_health.issues_detected}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400">Can Analyze:</span>
+                    <span className={`font-medium ${results.file_health.can_analyze ? 'text-green-600' : 'text-red-600'}`}>
+                      {results.file_health.can_analyze ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {results.file_health.format_mismatch && (
+                    <div className="p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <div className="flex items-center space-x-2">
+                        <AlertTriangle className="w-4 h-4 text-orange-600" />
+                        <span className="text-sm text-orange-800 dark:text-orange-200 font-medium">
+                          Format mismatch detected
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* File Structure Analysis */}
+        {results.file_structure_analysis && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="w-10 h-10 bg-purple-50 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                <Target className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">File Structure Analysis</h3>
+            </div>
+            
+            {/* Issues Summary */}
+            <div className="grid md:grid-cols-4 gap-4 mb-6">
+              <div className="text-center p-4 bg-red-50 dark:bg-red-900/30 rounded-lg">
+                <div className="text-2xl font-bold text-red-600 mb-2">{results.file_structure_analysis.issues_by_severity.high}</div>
+                <div className="text-sm font-medium text-red-800 dark:text-red-200">High Priority</div>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-600 mb-2">{results.file_structure_analysis.issues_by_severity.medium}</div>
+                <div className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Medium Priority</div>
+              </div>
+              <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600 mb-2">{results.file_structure_analysis.issues_by_severity.low}</div>
+                <div className="text-sm font-medium text-blue-800 dark:text-blue-200">Low Priority</div>
+              </div>
+              <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="text-2xl font-bold text-gray-600 mb-2">{results.file_structure_analysis.issues_by_severity.info}</div>
+                <div className="text-sm font-medium text-gray-800 dark:text-gray-200">Info</div>
+              </div>
+            </div>
+
+            {/* Detailed Issues */}
+            {results.file_structure_analysis.detailed_issues.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Detailed Issues</h4>
+                {results.file_structure_analysis.detailed_issues.map((issue, index) => (
+                  <div key={index} className={`p-4 rounded-lg border ${
+                    issue.severity === 'high' ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800' :
+                    issue.severity === 'medium' ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800' :
+                    issue.severity === 'low' ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800' :
+                    'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                  }`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            issue.severity === 'high' ? 'bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200' :
+                            issue.severity === 'medium' ? 'bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200' :
+                            issue.severity === 'low' ? 'bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200' :
+                            'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                          }`}>
+                            {issue.severity.toUpperCase()}
+                          </span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{issue.type}</span>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 text-sm mb-2">{issue.message}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <strong>Recommendation:</strong> {issue.recommendation}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Detailed Quality Metrics */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
