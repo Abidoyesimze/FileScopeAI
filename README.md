@@ -41,6 +41,13 @@ FileScope AI solves this by providing **AI-powered analysis with blockchain veri
 - **Bias Visualization**: Clear representation of detected biases
 - **Quality Metrics**: Visual quality scorecards and improvement suggestions
 
+### 🔗Key SDK Features
+- Easy dataset upload and analysis via simple function calls
+- Access the same quality scoring, anomaly detection, and bias analysis used in the main platform
+- Direct integration with Filecoin/IPFS for decentralized storage
+- Configurable analysis depth and visualization inclusion
+- Lightweight and compatible with Python 3.8+
+
 ---
 
 ## 🏗️ Architecture
