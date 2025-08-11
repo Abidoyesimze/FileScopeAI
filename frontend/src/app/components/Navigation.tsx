@@ -65,6 +65,12 @@ const Navigation = () => {
             >
               Explore Datasets
             </button>
+            <Link 
+              href="/sdk"
+              className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+              SDK
+            </Link>
           </div>
 
           {/* Right side - Theme toggle and Connect Wallet */}
@@ -112,6 +118,13 @@ const Navigation = () => {
               >
                 Explore Datasets
               </button>
+              <Link 
+                href="/sdk"
+                onClick={() => setIsMenuOpen(false)}
+                className="text-left text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
+              >
+                SDK
+              </Link>
             </div>
           </div>
         )}

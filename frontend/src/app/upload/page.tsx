@@ -78,7 +78,10 @@ const FileScopeApp = () => {
   const supportedTypes: Record<string, SupportedType> = useMemo(() => ({
     'text/csv': { icon: FileSpreadsheet, label: 'CSV', color: 'green' },
     'application/json': { icon: Code, label: 'JSON', color: 'blue' },
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { icon: FileText, label: 'XLSX', color: 'orange' }
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': { icon: FileText, label: 'XLSX', color: 'orange' },
+    'application/msword': { icon: FileText, label: 'DOC', color: 'purple' },
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { icon: FileText, label: 'DOCX', color: 'purple' },
+    'text/plain': { icon: FileText, label: 'TXT', color: 'gray' }
   }), []);
 
   // Sample datasets
@@ -244,7 +247,7 @@ const FileScopeApp = () => {
     setError(null);
     
     if (!supportedTypes[file.type]) {
-      const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, or Excel files.`;
+      const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, Excel, Word, or text files.`;
       setError(errorMsg);
       toast.error(errorMsg);
       return;
@@ -412,6 +415,11 @@ const FileScopeApp = () => {
       
       // Step 3: Convert backend format to frontend format
       const frontendResults = analysisAPI.convertToFrontendFormat(completedAnalysis);
+      
+      // Log the full backend response to see what we're getting
+      console.log('🔍 Full Backend API Response:', completedAnalysis);
+      console.log('📊 Converted Frontend Results:', frontendResults);
+      
       setAnalysisResults(frontendResults); // Store results in state
       
       // Step 4: Upload to IPFS
@@ -1129,7 +1137,7 @@ const FileScopeApp = () => {
             </div>
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Upload Your Dataset</h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Upload any CSV, JSON, or Excel file to get instant AI-powered analysis with complete transparency on Filecoin
+              Upload any CSV, JSON, Excel, Word, or text file to get instant AI-powered analysis with complete transparency on Filecoin
             </p>
           </div>
 
@@ -1163,7 +1171,7 @@ const FileScopeApp = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.json,.xlsx,.xls"
+                  accept=".csv,.json,.xlsx,.xls,.doc,.docx,.txt"
                   onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
                   className="hidden"
                 />
