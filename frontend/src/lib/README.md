@@ -16,15 +16,23 @@ Official SDK for FileScope AI - AI-powered dataset analysis and quality assessme
 ### JavaScript/TypeScript
 
 ```bash
-npm install filescope-ai-sdk
-# or
-yarn add filescope-ai-sdk
+# Install from GitHub
+npm install github:Abidoyesimze/FileScopeAI
+
+# Or using yarn
+yarn add github:Abidoyesimze/FileScopeAI
 ```
 
 ### Python
 
 ```bash
-pip install filescope-ai-sdk
+# Install from GitHub
+pip install git+https://github.com/Abidoyesimze/FileScopeAI.git
+
+# Or clone and install locally
+git clone https://github.com/Abidoyesimze/FileScopeAI.git
+cd FileScopeAI
+pip install -e .
 ```
 
 ## Quick Start

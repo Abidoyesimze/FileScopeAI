@@ -283,12 +283,18 @@ pip install requests pandas numpy`}
                 <InstallationStep
                   number={1}
                   title="Install SDK Package"
-                  description="Install the FileScope AI SDK using npm or yarn"
-                  code={`# Using npm
-npm install filescope-ai-sdk
+                  description="Install the FileScope AI SDK from GitHub"
+                  code={`# Install directly from GitHub
+npm install github:Abidoyesimze/FileScopeAI
 
-# Using yarn
-yarn add filescope-ai-sdk`}
+# Or using yarn
+yarn add github:Abidoyesimze/FileScopeAI
+
+# Alternative: Clone and install locally
+git clone https://github.com/Abidoyesimze/FileScopeAI.git
+cd FileScopeAI
+npm install
+npm run build`}
                   language="bash"
                   label="install-sdk-package"
                 />
@@ -296,7 +302,10 @@ yarn add filescope-ai-sdk`}
                   number={2}
                   title="Import in Your Component"
                   description="Import the SDK and React hook in your React component"
-                  code={`import { FileScopeSDK, useFileScopeAnalysis } from './lib/filescope-sdk';`}
+                  code={`# Import from GitHub package
+import { FileScopeSDK, useFileScopeAnalysis } from 'filescope-ai-sdk';
+
+# The package will be available after GitHub installation`}
                   language="typescript"
                   label="import-sdk"
                 />

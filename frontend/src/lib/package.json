@@ -30,10 +30,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/filescope-ai/filescope-ai-sdk.git"
+    "url": "https://github.com/Abidoyesimze/FileScopeAI.git"
   },
   "bugs": {
-    "url": "https://github.com/filescope-ai/filescope-ai-sdk/issues"
+    "url": "https://github.com/Abidoyesimze/FileScopeAI/issues"
   },
   "homepage": "https://filescope.ai/sdk",
   "peerDependencies": {
