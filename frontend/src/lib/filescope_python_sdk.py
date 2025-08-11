@@ -19,13 +19,13 @@ class FileScopePythonSDK:
     from Python applications, Jupyter notebooks, and data science workflows.
     """
     
-    def __init__(self, api_key: str, base_url: str = "https://api.filescope.ai"):
+    def __init__(self, api_key: str, base_url: str = "https://filescopeai-qdpp.onrender.com/api"):
         """
         Initialize the FileScope AI Python SDK
         
         Args:
             api_key (str): Your FileScope AI API key
-            base_url (str): Base URL for the API (default: https://api.filescope.ai)
+            base_url (str): Base URL for the API (default: https://filescopeai-qdpp.onrender.com/api)
         """
         self.api_key = api_key
         self.base_url = base_url.rstrip('/')

@@ -66,7 +66,7 @@ export class FileScopeSDK {
   private apiKey: string;
   private baseUrl: string;
 
-  constructor(apiKey: string, baseUrl: string = 'https://api.filescope.ai') {
+  constructor(apiKey: string, baseUrl: string = 'https://filescopeai-qdpp.onrender.com/api') {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
   }
