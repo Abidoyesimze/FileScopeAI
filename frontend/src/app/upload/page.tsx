@@ -36,13 +36,6 @@ interface SampleDataset {
   type: string;
 }
 
-interface ExtensionMismatchData {
-  detected: boolean;
-  expectedType: string;
-  actualType: string;
-  filename: string;
-}
-
 const FileScopeApp = () => {
   // Navigation state
   const [currentStep, setCurrentStep] = useState<'upload' | 'preview' | 'processing'>('upload');
@@ -66,9 +59,6 @@ const FileScopeApp = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [ipfsHash, setIpfsHash] = useState<string | null>(null);
-
-  // Extension mismatch detection state
-  const [extensionMismatchData, setExtensionMismatchData] = useState<ExtensionMismatchData | null>(null);
 
   // Wallet connection check
   const { isConnected } = useAccount();
@@ -125,66 +115,11 @@ const FileScopeApp = () => {
       fileName: uploadedFile?.name,
       fileSize: uploadedFile?.size,
       fileType: uploadedFile?.type,
-      isPublic,
-      extensionMismatchData
+      isPublic
     };
     sessionStorage.setItem('uploadState', JSON.stringify(state));
     console.log('💾 Saved state to sessionStorage:', state);
-  }, [currentStep, analysisProgress, currentAnalysisId, uploadedFile, isPublic, extensionMismatchData]);
-
-  // Function to detect file content type vs extension mismatch
-  const detectExtensionMismatch = useCallback((file: File): Promise<ExtensionMismatchData | null> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        const filename = file.name;
-        const fileExtension = filename.split('.').pop()?.toLowerCase() || '';
-        
-        let detectedType = '';
-        
-        // Detect actual content type
-        if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
-          try {
-            JSON.parse(content);
-            detectedType = 'json';
-          } catch {
-            detectedType = 'text';
-          }
-        } else if (content.includes(',') && content.includes('\n')) {
-          // Basic CSV detection
-          detectedType = 'csv';
-        } else {
-          detectedType = 'text';
-        }
-        
-        // Check for mismatch
-        const expectedTypeMap: Record<string, string> = {
-          'csv': 'csv',
-          'json': 'json',
-          'xlsx': 'xlsx',
-          'xls': 'xlsx'
-        };
-        
-        const expectedType = expectedTypeMap[fileExtension];
-        
-        if (expectedType && expectedType !== detectedType && detectedType !== 'text') {
-          resolve({
-            detected: true,
-            expectedType,
-            actualType: detectedType,
-            filename
-          });
-        } else {
-          resolve(null);
-        }
-      };
-      
-      reader.onerror = () => resolve(null);
-      reader.readAsText(file.slice(0, 1024)); // Read first 1KB for detection
-    });
-  }, []);
+  }, [currentStep, analysisProgress, currentAnalysisId, uploadedFile, isPublic]);
 
   // IPFS Upload Function using Pinata
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,7 +200,6 @@ const FileScopeApp = () => {
       setIsPublic(false);
       setAnalysisResults(null);
       setIpfsHash(null);
-      setExtensionMismatchData(null);
       resetContract();
     }
   }, [resetContract]);
@@ -280,7 +214,6 @@ const FileScopeApp = () => {
     setIsPublic(false);
     setAnalysisResults(null);
     setIpfsHash(null);
-    setExtensionMismatchData(null);
     resetContract();
   }, [resetContract]);
 
@@ -307,9 +240,8 @@ const FileScopeApp = () => {
     reader.readAsText(file);
   }, []);
 
-  const handleFileUpload = useCallback(async (file: File) => {
+  const handleFileUpload = useCallback((file: File) => {
     setError(null);
-    setExtensionMismatchData(null);
     
     if (!supportedTypes[file.type]) {
       const errorMsg = `Unsupported file type: ${file.type}. Please upload CSV, JSON, or Excel files.`;
@@ -325,28 +257,11 @@ const FileScopeApp = () => {
       return;
     }
 
-    // Detect extension mismatch
-    try {
-      const mismatchData = await detectExtensionMismatch(file);
-      if (mismatchData) {
-        setExtensionMismatchData(mismatchData);
-        toast.error(
-          `Extension mismatch detected: Expected .${mismatchData.expectedType} but found ${mismatchData.actualType} content`,
-          {
-            duration: 6000,
-            icon: '⚠️',
-          }
-        );
-      }
-    } catch (error) {
-      console.warn('Failed to detect extension mismatch:', error);
-    }
-
     setUploadedFile(file);
     generatePreview(file);
     setCurrentStep('preview');
     toast.success('File uploaded successfully! Review your data below.');
-  }, [supportedTypes, generatePreview, detectExtensionMismatch]);
+  }, [supportedTypes, generatePreview]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -383,7 +298,6 @@ const FileScopeApp = () => {
       { type: 'text/csv' }
     );
     setUploadedFile(mockFile);
-    setExtensionMismatchData(null); // Clear any previous mismatch data
     
     setFilePreview({
       headers: ['poll_date', 'candidate', 'party', 'percentage', 'sample_size', 'location'],
@@ -603,8 +517,7 @@ const FileScopeApp = () => {
                       blockNumber: 'restored',
                       gasUsed: 'N/A',
                       status: 'restored'
-                    },
-                    extensionMismatchData: parsedState.extensionMismatchData
+                    }
                   };
                   
                   sessionStorage.setItem('analysisResults', JSON.stringify(resultsData));
@@ -622,7 +535,6 @@ const FileScopeApp = () => {
                   setAnalysisProgress(parsedState.analysisProgress || 0);
                   setCurrentAnalysisId(parsedState.currentAnalysisId);
                   setIsAnalyzing(true);
-                  setExtensionMismatchData(parsedState.extensionMismatchData || null);
                   
                   // Restore file data if available
                   if (parsedState.fileName) {
@@ -656,7 +568,6 @@ const FileScopeApp = () => {
           setAnalysisProgress(parsedState.analysisProgress || 0);
           setCurrentAnalysisId(parsedState.currentAnalysisId);
           setIsAnalyzing(false);
-          setExtensionMismatchData(parsedState.extensionMismatchData || null);
           
           if (parsedState.fileName && parsedState.fileSize) {
             const mockFile = new File([''], parsedState.fileName, { 
@@ -672,7 +583,7 @@ const FileScopeApp = () => {
         toast.error('Failed to restore previous session.');
       }
     }
-  }, [router, clearSavedState, continueAnalysisMonitoring]);
+  }, [router, clearSavedState]);
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -704,8 +615,7 @@ const FileScopeApp = () => {
           blockNumber: transactionReceipt.blockNumber?.toString() || 'confirmed',
           gasUsed: transactionReceipt.gasUsed?.toString() || 'N/A',
           status: 'confirmed'
-        },
-        extensionMismatchData: extensionMismatchData
+        }
       };
       
       sessionStorage.setItem('analysisResults', JSON.stringify(resultsData));
@@ -727,7 +637,7 @@ const FileScopeApp = () => {
         router.push('/results');
       }, 1000);
     }
-  }, [mounted, isTransactionConfirmed, transactionReceipt, analysisResults, ipfsHash, uploadedFile, currentAnalysisId, isPublic, blockchainData, router, clearSavedState, extensionMismatchData]);
+  }, [mounted, isTransactionConfirmed, transactionReceipt, analysisResults, ipfsHash, uploadedFile, currentAnalysisId, isPublic, blockchainData, router, clearSavedState]);
 
   // Watch for contract errors
   useEffect(() => {
@@ -757,57 +667,6 @@ const FileScopeApp = () => {
       saveState();
     }
   }, [currentStep, analysisProgress, currentAnalysisId, isAnalyzing, saveState]);
-
-  // Extension Mismatch Warning Banner Component
-  const ExtensionMismatchBanner: React.FC<{
-    mismatchData: ExtensionMismatchData;
-    onDismiss: () => void;
-  }> = ({ mismatchData, onDismiss }) => {
-    return (
-      <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-6">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <AlertCircle className="w-6 h-6 text-orange-600" />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-2">
-                <FileText className="w-5 h-5 text-orange-600" />
-                <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100">
-                  File Extension Mismatch Detected
-                </h3>
-              </div>
-              
-              <div className="space-y-1 mb-3 text-sm text-orange-800 dark:text-orange-200">
-                <p>
-                  <strong>File:</strong> {mismatchData.filename}
-                </p>
-                <p>
-                  <strong>Expected:</strong> <span className="font-mono bg-orange-100 dark:bg-orange-800 px-2 py-1 rounded">.{mismatchData.expectedType}</span> format
-                </p>
-                <p>
-                  <strong>Detected:</strong> <span className="font-mono bg-orange-100 dark:bg-orange-800 px-2 py-1 rounded">{mismatchData.actualType}</span> content
-                </p>
-              </div>
-              
-              <p className="text-sm text-orange-700 dark:text-orange-300">
-                The analysis will proceed using the detected content format. For optimal results, 
-                consider renaming your file with the correct extension.
-              </p>
-            </div>
-          </div>
-          
-          <button
-            onClick={onDismiss}
-            className="flex-shrink-0 ml-4 p-1 text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-200"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   // Conditional rendering - but AFTER all hooks have been called
   const shouldShowContent = mounted && isConnected;
@@ -1086,7 +945,6 @@ const FileScopeApp = () => {
                             setIsAnalyzing(false);
                             setAnalysisProgress(0);
                             setCurrentAnalysisId(null);
-                            setExtensionMismatchData(null);
                             toast.success('Restarted session. Please upload your file again.');
                           }}
                           className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
@@ -1117,14 +975,6 @@ const FileScopeApp = () => {
                 Review your data preview and start the AI analysis process
               </p>
             </div>
-
-            {/* Extension Mismatch Warning */}
-            {extensionMismatchData && (
-              <ExtensionMismatchBanner
-                mismatchData={extensionMismatchData}
-                onDismiss={() => setExtensionMismatchData(null)}
-              />
-            )}
 
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
               {/* File Header */}

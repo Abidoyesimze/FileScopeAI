@@ -1,4 +1,5 @@
-// FileScope AI API Service - UPDATED WITH EXTENSION MISMATCH HANDLING
+// FileScope AI API Service - SIMPLIFIED VERSION
+// Skip the problematic status endpoint, use direct results endpoint
 
 const API_BASE_URL = 'https://filescopeai.onrender.com/api';
 const PINATA_JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET;
@@ -6,96 +7,7 @@ const PINATA_JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET;
 console.log('🔧 FileScope AI API initialized with URL:', API_BASE_URL);
 console.log('🔑 Pinata JWT Secret configured:', PINATA_JWT_SECRET ? 'Yes' : 'No');
 
-// Updated interfaces to match new backend structure
-export interface DatasetInfo {
-  original_filename: string;
-  rows: number;
-  columns: number;
-  size_bytes: number;
-  file_type: string;
-  actual_content_type: string;
-  extension_mismatch: boolean;
-  column_names: string[];
-  column_types: Record<string, string>;
-  memory_usage_mb: number;
-  has_missing_values: boolean;
-  missing_percentage: number;
-}
-
-export interface QualityScore {
-  total_score: number;
-  base_score: number;
-  issue_penalty: number;
-  grade: string;
-  component_scores: {
-    completeness: number;
-    consistency: number;
-    format_compliance: number;
-  };
-}
-
-export interface BasicMetrics {
-  total_rows: number;
-  total_columns: number;
-  memory_usage_mb: number;
-  missing_values_count: number;
-  missing_percentage: number;
-  duplicate_rows: number;
-  content_type: string;
-  numeric_columns: number;
-  text_columns: number;
-  column_types: Record<string, string>;
-}
-
-export interface FileStructureIssue {
-  type: string;
-  severity: 'high' | 'medium' | 'low' | 'info';
-  message: string;
-  recommendation: string;
-}
-
-export interface FileStructureAnalysis {
-  issues_found: number;
-  extension_mismatch: boolean;
-  actual_content_type: string;
-  issues_by_severity: {
-    high: number;
-    medium: number;
-    low: number;
-    info: number;
-  };
-  detailed_issues: FileStructureIssue[];
-}
-
-export interface FileHealth {
-  structure_score: number;
-  issues_detected: number;
-  format_mismatch: boolean;
-  can_analyze: boolean;
-}
-
-export interface AnalysisResults {
-  quality_score: QualityScore;
-  basic_metrics: BasicMetrics;
-  file_structure_analysis: FileStructureAnalysis;
-  insights: string[];
-}
-
-export interface NewUploadResponse {
-  success: boolean;
-  analysis_id: string;
-  status: 'completed' | 'processing' | 'pending' | 'failed';
-  dataset_info: DatasetInfo;
-  results: AnalysisResults;
-  file_health: FileHealth;
-  visualizations?: {
-    available: string[];
-    included: boolean;
-    count: number;
-  };
-}
-
-// Legacy interfaces for backward compatibility
+// Keep all existing types
 export interface AnalysisMetrics {
   quality_score: number;
   completeness: number;
@@ -200,10 +112,6 @@ export interface FrontendAnalysisResult {
     contractAddress: string;
     blockNumber: string;
     isPublic: boolean;
-    // New fields for extension mismatch
-    extensionMismatch?: boolean;
-    actualContentType?: string;
-    expectedFileType?: string;
   };
   qualityScore: {
     overall: number;
@@ -237,9 +145,6 @@ export interface FrontendAnalysisResult {
     description: string;
     action: string;
   }>;
-  // New field for file structure issues
-  fileStructureIssues?: FileStructureIssue[];
-  fileHealth?: FileHealth;
 }
 
 class AnalysisAPIService {
@@ -301,12 +206,12 @@ class AnalysisAPIService {
     }
   }
 
-  // Updated upload method that handles new response format
+  // Upload and analyze dataset - SAME AS BEFORE
   async uploadAndAnalyze(
     file: File, 
     isPublic: boolean = false,
     includeVisualizations: boolean = false
-  ): Promise<NewUploadResponse | UploadResponse> {
+  ): Promise<UploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('is_public', isPublic.toString());
@@ -325,6 +230,29 @@ class AnalysisAPIService {
     console.log('🔒 Is public:', isPublic);
     console.log('📊 Include visualizations:', includeVisualizations);
     console.log('🌐 Full URL:', fullUrl);
+
+    // Additional debugging for JSON files
+    if (file.type === 'application/json') {
+      console.log('🔍 JSON File Analysis:');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const jsonData = JSON.parse(content);
+          console.log('✅ JSON is valid');
+          console.log('📊 JSON structure:', {
+            isArray: Array.isArray(jsonData),
+            isObject: typeof jsonData === 'object',
+            length: Array.isArray(jsonData) ? jsonData.length : 'N/A',
+            keys: typeof jsonData === 'object' ? Object.keys(jsonData) : 'N/A',
+            sampleKeys: Array.isArray(jsonData) && jsonData.length > 0 ? Object.keys(jsonData[0]) : 'N/A'
+          });
+        } catch (jsonError) {
+          console.error('❌ JSON validation failed:', jsonError);
+        }
+      };
+      reader.readAsText(file);
+    }
 
     try {
       const response = await fetch(fullUrl, {
@@ -347,11 +275,14 @@ class AnalysisAPIService {
         let errorMessage = `Upload failed (${response.status}): ${response.statusText}`;
         
         try {
+          // The error response might be a JSON string, so we need to parse it
           let errorJson;
           if (errorText.startsWith('"') && errorText.endsWith('"')) {
+            // It's a JSON string, parse it first
             const parsedString = JSON.parse(errorText);
             errorJson = JSON.parse(parsedString);
           } else {
+            // It's already a JSON object
             errorJson = JSON.parse(errorText);
           }
           
@@ -363,15 +294,17 @@ class AnalysisAPIService {
           }
         } catch (parseError) {
           console.log('Could not parse error response as JSON:', parseError);
+          // If we can't parse it, use the raw error text
           if (errorText.length < 200) {
             errorMessage = `Server Error: ${errorText}`;
           }
         }
         
+        // Provide specific guidance based on error type
         if (response.status === 500) {
           if (file.type === 'application/json') {
             errorMessage += '\n\nJSON files might need to be in a specific format. Try converting to CSV or check if your JSON is properly formatted.';
-          } else if (file.size > 50 * 1024 * 1024) {
+          } else if (file.size > 50 * 1024 * 1024) { // 50MB
             errorMessage += '\n\nFile might be too large. Try a smaller file (under 50MB).';
           } else {
             errorMessage += '\n\nServer is having trouble processing this file. Try a different file or format.';
@@ -383,28 +316,11 @@ class AnalysisAPIService {
 
       const result = await response.json();
       console.log('✅ Upload successful! Analysis ID:', result.analysis_id);
-      
-        // Check for extension mismatch and log warning
-      if (result.dataset_info?.extension_mismatch) {
-        console.warn('⚠️ Extension mismatch detected:', {
-          expectedType: result.dataset_info.file_type,
-          actualType: result.dataset_info.actual_content_type,
-          filename: result.dataset_info.original_filename
-        });
-        
-        // Store extension mismatch info in result for UI display
-        result._extensionMismatchInfo = {
-          detected: true,
-          expectedType: result.dataset_info.file_type,
-          actualType: result.dataset_info.actual_content_type,
-          filename: result.dataset_info.original_filename
-        };
-      }
-      
       return result;
     } catch (error) {
       console.error('🚨 Upload Error:', error);
       
+      // If it's a network error, provide helpful guidance
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error: Unable to connect to the analysis server. Please check your internet connection and try again.');
       }
@@ -413,205 +329,18 @@ class AnalysisAPIService {
     }
   }
 
-  // Updated conversion method to handle new backend format
-  convertToFrontendFormat(backendResult: NewUploadResponse | UploadResponse): FrontendAnalysisResult {
-    console.log('🔍 Converting backend result to frontend format:', JSON.stringify(backendResult, null, 2));
-    
-    if (!backendResult) {
-      console.error('❌ Backend result is null or undefined');
-      throw new Error('Invalid backend result: result is null or undefined');
-    }
-
-    // Check if it's the new format
-    if ('dataset_info' in backendResult && 'results' in backendResult) {
-      const newResult = backendResult as NewUploadResponse;
-      
-      return {
-        metadata: {
-          fileName: newResult.dataset_info.original_filename,
-          uploadDate: new Date().toISOString(),
-          fileSize: this.formatBytes(newResult.dataset_info.size_bytes),
-          rows: newResult.dataset_info.rows,
-          columns: newResult.dataset_info.columns,
-          processingTime: '2-3 seconds',
-          ipfsHash: 'QmXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxX',
-          contractAddress: '0x742d35Cc6634C0532925a3b8D4C045B16f5b5d5E',
-          blockNumber: '12345678',
-          isPublic: false,
-          // Extension mismatch fields
-          extensionMismatch: newResult.dataset_info.extension_mismatch,
-          actualContentType: newResult.dataset_info.actual_content_type,
-          expectedFileType: newResult.dataset_info.file_type,
-        },
-        qualityScore: {
-          overall: Math.round(newResult.results.quality_score.total_score),
-          completeness: Math.round(newResult.results.quality_score.component_scores.completeness),
-          consistency: Math.round(newResult.results.quality_score.component_scores.consistency),
-          accuracy: 85, // Default fallback
-          validity: Math.round(newResult.results.quality_score.component_scores.format_compliance),
-        },
-        anomalies: {
-          total: newResult.results.file_structure_analysis.issues_found,
-          high: newResult.results.file_structure_analysis.issues_by_severity.high,
-          medium: newResult.results.file_structure_analysis.issues_by_severity.medium,
-          low: newResult.results.file_structure_analysis.issues_by_severity.low,
-          details: newResult.results.file_structure_analysis.detailed_issues.map(issue => ({
-            column: 'File Structure',
-            type: issue.type,
-            count: 1,
-            severity: issue.severity,
-            description: issue.message,
-            recommendation: issue.recommendation
-          }))
-        },
-        biasMetrics: {
-          overall: 0.15, // Default fallback
-          geographic: { 
-            score: 0.1, 
-            status: 'Low', 
-            description: 'Minimal geographic bias detected' 
-          },
-          demographic: { 
-            score: 0.2, 
-            status: 'Low', 
-            description: 'Some demographic skew present' 
-          }
-        },
-        insights: this.convertInsightsToFrontendFormat(newResult.results.insights, newResult.dataset_info),
-        fileStructureIssues: newResult.results.file_structure_analysis.detailed_issues,
-        fileHealth: newResult.file_health
-      };
-    } else {
-      // Handle legacy format
-      const legacyResult = backendResult as UploadResponse;
-      
-      const metadata = legacyResult.metadata || {
-        file_name: 'dataset.csv',
-        upload_date: new Date().toISOString(),
-        file_size: '0 B',
-        rows: 0,
-        columns: 0,
-        ipfs_hash: '',
-        contract_address: '',
-        block_number: '',
-        is_public: false
-      };
-      
-      const results = legacyResult.results || {
-        metrics: {
-          quality_score: 85,
-          completeness: 90,
-          consistency: 85,
-          accuracy: 85,
-          validity: 85,
-          anomalies: {
-            total: 0,
-            high: 0,
-            medium: 0,
-            low: 0,
-            details: []
-          },
-          bias_metrics: {
-            overall: 0.15,
-            geographic: { score: 0.1, status: 'Low', description: 'Minimal geographic bias detected' },
-            demographic: { score: 0.2, status: 'Low', description: 'Some demographic skew present' }
-          }
-        },
-        insights: []
-      };
-      
-      const metrics = results.metrics;
-      const insights = results.insights || [{
-        type: 'info',
-        title: 'Analysis Complete',
-        description: `Successfully analyzed your dataset with ${metadata.rows || 0} rows.`,
-        action: 'Review the quality scores and metrics above for detailed insights.'
-      }];
-      
-      return {
-        metadata: {
-          fileName: metadata.file_name || 'dataset.csv',
-          uploadDate: metadata.upload_date || new Date().toISOString(),
-          fileSize: metadata.file_size || '0 B',
-          rows: metadata.rows || 0,
-          columns: metadata.columns || 0,
-          processingTime: '2-3 seconds',
-          ipfsHash: metadata.ipfs_hash || '',
-          contractAddress: metadata.contract_address || '',
-          blockNumber: metadata.block_number || '',
-          isPublic: metadata.is_public || false,
-        },
-        qualityScore: {
-          overall: metrics.quality_score || 85,
-          completeness: metrics.completeness || 90,
-          consistency: metrics.consistency || 85,
-          accuracy: metrics.accuracy || 85,
-          validity: metrics.validity || 85,
-        },
-        anomalies: metrics.anomalies || {
-          total: 0,
-          high: 0,
-          medium: 0,
-          low: 0,
-          details: [],
-        },
-        biasMetrics: metrics.bias_metrics || {
-          overall: 0.15,
-          geographic: { 
-            score: 0.1, 
-            status: 'Low', 
-            description: 'Minimal geographic bias detected' 
-          },
-          demographic: { 
-            score: 0.2, 
-            status: 'Low', 
-            description: 'Some demographic skew present' 
-          }
-        },
-        insights: insights,
-      };
-    }
-  }
-
-  private convertInsightsToFrontendFormat(insights: string[], datasetInfo: DatasetInfo): Array<{type: string; title: string; description: string; action: string}> {
-    const frontendInsights = insights.map(insight => ({
-      type: 'info',
-      title: 'Data Analysis Insight',
-      description: insight,
-      action: 'Review the data quality metrics and consider the recommendations.'
-    }));
-
-    // Add extension mismatch insight if present
-    if (datasetInfo.extension_mismatch) {
-      frontendInsights.unshift({
-        type: 'warning',
-        title: 'File Extension Mismatch Detected',
-        description: `The file was uploaded as '${datasetInfo.file_type}' but contains '${datasetInfo.actual_content_type}' content. The analysis proceeded using the detected content format.`,
-        action: 'Verify your file format. Consider renaming with the correct extension or converting to the expected format for optimal results.'
-      });
-    }
-
-    return frontendInsights;
-  }
-
-  private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  }
-
-  // Keep existing methods for backward compatibility
+  // Get analysis results - USING THE WORKING ENDPOINT
   async getAnalysisResults(analysisId: string | number): Promise<UploadResponse> {
+    // Use the endpoint that you confirmed works: /api/analysis/{analysis_id}/
     return this.makeRequest<UploadResponse>(`analysis/${analysisId}/`);
   }
 
+  // SIMPLIFIED: Skip status checking, go straight to results with retries
   async waitForAnalysisCompletion(
     analysisId: string | number,
     onProgress?: (status: string, progress?: number) => void
   ): Promise<UploadResponse> {
-    const maxAttempts = 12;
+    const maxAttempts = 12; // Try for 1 minute with 5-second intervals
     let attempts = 0;
 
     console.log('⏳ Waiting for analysis completion...', analysisId);
@@ -623,9 +352,11 @@ class AnalysisAPIService {
           onProgress('processing', progress);
         }
 
+        // Try to get the analysis results directly
         console.log(`📊 Attempt ${attempts + 1}: Checking for analysis results...`);
         const results = await this.getAnalysisResults(analysisId);
         
+        // Check if we got valid results with the required structure
         if (results && results.results && results.results.metrics) {
           console.log('✅ Analysis results retrieved successfully!');
           if (onProgress) {
@@ -637,6 +368,7 @@ class AnalysisAPIService {
           console.log('📋 Received results structure:', JSON.stringify(results, null, 2));
         }
 
+        // Wait 5 seconds before next attempt
         await new Promise(resolve => setTimeout(resolve, 5000));
         attempts++;
         
@@ -644,19 +376,25 @@ class AnalysisAPIService {
         console.log(`❌ Attempt ${attempts + 1} failed:`, error);
         attempts++;
         
+        // If we've tried many times, give up
         if (attempts >= maxAttempts) {
           console.error('🚨 Max attempts reached, providing fallback results');
+          
+          // Return fallback results so the user gets something
           return this.createFallbackResults(analysisId);
         }
         
+        // Wait before retry
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
 
+    // Fallback if everything fails
     console.log('🔄 All attempts failed, using fallback results');
     return this.createFallbackResults(analysisId);
   }
 
+  // Create fallback results when API calls fail
   private createFallbackResults(analysisId: string | number): UploadResponse {
     console.log('🔄 Creating fallback analysis results...');
     
@@ -735,11 +473,13 @@ class AnalysisAPIService {
     };
   }
 
+  // Get analysis status
   async getAnalysisStatus(analysisId: string | number): Promise<AnalysisStatus> {
     try {
       console.log('🔍 Checking analysis status for ID:', analysisId);
       const response = await this.getAnalysisResults(analysisId);
       
+      // Convert the response to AnalysisStatus format
       const status: AnalysisStatus = {
         analysis_id: String(analysisId),
         status: response.status || 'completed',
@@ -766,20 +506,135 @@ class AnalysisAPIService {
     }
   }
 
+  // Convert backend format to frontend format - UPDATED for actual API structure
+  convertToFrontendFormat(backendResult: UploadResponse): FrontendAnalysisResult {
+    // Debug log to see what we actually received
+    console.log('🔍 Converting backend result to frontend format:', JSON.stringify(backendResult, null, 2));
+    
+    // Validate input
+    if (!backendResult) {
+      console.error('❌ Backend result is null or undefined');
+      throw new Error('Invalid backend result: result is null or undefined');
+    }
+    
+    // Extract data from the actual API response structure with proper fallbacks
+    const metadata = backendResult.metadata || {
+      file_name: 'dataset.csv',
+      upload_date: new Date().toISOString(),
+      file_size: '0 B',
+      rows: 0,
+      columns: 0,
+      ipfs_hash: '',
+      contract_address: '',
+      block_number: '',
+      is_public: false
+    };
+    
+    const results = backendResult.results || {
+      metrics: {
+        quality_score: 85,
+        completeness: 90,
+        consistency: 85,
+        accuracy: 85,
+        validity: 85,
+        anomalies: {
+          total: 0,
+          high: 0,
+          medium: 0,
+          low: 0,
+          details: []
+        },
+        bias_metrics: {
+          overall: 0.15,
+          geographic: { score: 0.1, status: 'Low', description: 'Minimal geographic bias detected' },
+          demographic: { score: 0.2, status: 'Low', description: 'Some demographic skew present' }
+        }
+      },
+      insights: []
+    };
+    
+    const metrics = results.metrics;
+    
+    console.log('📊 Extracted data:', {
+      hasMetadata: !!metadata,
+      hasResults: !!results,
+      hasMetrics: !!metrics,
+      metadataKeys: Object.keys(metadata),
+      resultsKeys: Object.keys(results),
+      metricsKeys: Object.keys(metrics)
+    });
+    
+    // Generate insights based on the actual data
+    const insights = results.insights || [{
+      type: 'info',
+      title: 'Analysis Complete',
+      description: `Successfully analyzed your dataset with ${metadata.rows || 0} rows.`,
+      action: 'Review the quality scores and metrics above for detailed insights.'
+    }];
+    
+    return {
+      metadata: {
+        fileName: metadata.file_name || 'dataset.csv',
+        uploadDate: metadata.upload_date || new Date().toISOString(),
+        fileSize: metadata.file_size || '0 B',
+        rows: metadata.rows || 0,
+        columns: metadata.columns || 0,
+        processingTime: '2-3 seconds',
+        ipfsHash: metadata.ipfs_hash || '',
+        contractAddress: metadata.contract_address || '',
+        blockNumber: metadata.block_number || '',
+        isPublic: metadata.is_public || false,
+      },
+      qualityScore: {
+        overall: metrics.quality_score || 85,
+        completeness: metrics.completeness || 90,
+        consistency: metrics.consistency || 85,
+        accuracy: metrics.accuracy || 85,
+        validity: metrics.validity || 85,
+      },
+      anomalies: metrics.anomalies || {
+        total: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        details: [],
+      },
+      biasMetrics: metrics.bias_metrics || {
+        overall: 0.15,
+        geographic: { 
+          score: 0.1, 
+          status: 'Low', 
+          description: 'Minimal geographic bias detected' 
+        },
+        demographic: { 
+          score: 0.2, 
+          status: 'Low', 
+          description: 'Some demographic skew present' 
+        }
+      },
+      insights: insights,
+    };
+  }
+
+  // Keep other methods for completeness but simplified
   async deleteAnalysis(analysisId: string): Promise<void> {
+    // This might not work due to URL issues, but keep for API completeness
     await this.makeRequest(`analysis/${analysisId}/delete/`, {
       method: 'DELETE',
     });
   }
 
   async getMyAnalyses(): Promise<MyAnalysis[]> {
+    // This might not work due to URL issues, but keep for API completeness
     return this.makeRequest<MyAnalysis[]>('my-analyses/');
   }
 
   async getPublicAnalysis(analysisCid: string): Promise<PublicAnalysis> {
+    // This might not work due to URL issues, but keep for API completeness
     return this.makeRequest<PublicAnalysis>(`public/${analysisCid}/`);
   }
 
+  // Test API connection
   async testConnection(): Promise<boolean> {
     try {
       console.log('🔧 Testing API connection...');
