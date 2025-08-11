@@ -1,11 +1,13 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
-import dts from 'rollup-plugin-dts';
 
-const packageJson = require('./package.json');
+const packageJson = {
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js"
+};
 
-export default [
+const config = [
   {
     input: 'filescope-sdk.ts',
     output: [
@@ -23,13 +25,14 @@ export default [
     plugins: [
       resolve(),
       commonjs(),
-      typescript({ tsconfig: './tsconfig.json' }),
+      typescript({ 
+        tsconfig: './tsconfig.json',
+        declaration: true,
+        declarationDir: './dist'
+      }),
     ],
     external: ['react'],
   },
-  {
-    input: 'dist/index.d.ts',
-    output: [{ file: 'dist/index.d.ts', format: 'es' }],
-    plugins: [dts()],
-  },
-]; 
+];
+
+export default config; 

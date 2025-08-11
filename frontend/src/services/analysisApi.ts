@@ -1,7 +1,7 @@
 // FileScope AI API Service - SIMPLIFIED VERSION
 // Skip the problematic status endpoint, use direct results endpoint
 
-const API_BASE_URL = 'https://filescopeai.onrender.com/api';
+const API_BASE_URL = 'https://filescopeai-qdpp.onrender.com/api';
 const PINATA_JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET;
 
 console.log('🔧 FileScope AI API initialized with URL:', API_BASE_URL);
