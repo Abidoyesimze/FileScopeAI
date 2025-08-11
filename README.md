@@ -456,15 +456,6 @@ Parameters:
 
 ---
 
-## 👥 Team
-
-- **Data Science Lead**: AI algorithm development and statistical analysis
-- **Blockchain Developer**: Filecoin integration and smart contracts  
-- **Full-Stack Developer**: Platform architecture and user experience
-- **UI/UX Designer**: Interface design and user research
-
----
-
 ## 📜 License
 
 MIT License - Built for EthNigeria 2025 Hackathon
