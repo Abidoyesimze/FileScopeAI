@@ -6,19 +6,10 @@ import Link from 'next/link';
 import { 
   CheckCircle, AlertTriangle, Shield, 
   Database, ArrowLeft, Download, Eye, Target, Award, 
-  Bell, Info, Verified, ArrowRight, FileX, X
+  Bell, Info, Verified, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// Extension Mismatch Interface
-interface ExtensionMismatchData {
-  detected: boolean;
-  expectedType: string;
-  actualType: string;
-  filename: string;
-}
-
-// Updated StoredAnalysisData Interface
 interface StoredAnalysisData {
   results: {
     metadata: {
@@ -32,10 +23,6 @@ interface StoredAnalysisData {
       contractAddress: string;
       blockNumber: string;
       isPublic: boolean;
-      // Extension mismatch fields
-      extensionMismatch?: boolean;
-      actualContentType?: string;
-      expectedFileType?: string;
     };
     qualityScore: {
       overall: number;
@@ -75,101 +62,12 @@ interface StoredAnalysisData {
   analysisId: string | number;
   timestamp: string;
   isPublic: boolean;
-  // Extension mismatch data
-  extensionMismatchData?: ExtensionMismatchData;
 }
-
-// Extension Mismatch Banner Component
-const ExtensionMismatchBanner: React.FC<{
-  mismatchData: ExtensionMismatchData;
-  onDismiss: () => void;
-}> = ({ mismatchData, onDismiss }) => {
-  return (
-    <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/30 dark:to-yellow-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-6 shadow-sm">
-      <div className="flex items-start justify-between">
-        <div className="flex items-start space-x-3 flex-1">
-          <div className="flex-shrink-0">
-            <div className="w-8 h-8 bg-orange-100 dark:bg-orange-800 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-orange-600" />
-            </div>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-2 mb-2">
-              <FileX className="w-5 h-5 text-orange-600" />
-              <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100">
-                File Extension Mismatch Detected
-              </h3>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-md p-3 mb-3 border border-orange-200 dark:border-orange-700">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">File:</span>
-                  <br />
-                  <span className="font-mono text-gray-900 dark:text-white">{mismatchData.filename}</span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Expected:</span>
-                  <br />
-                  <span className="inline-block bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs font-mono">
-                    .{mismatchData.expectedType}
-                  </span>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Detected:</span>
-                  <br />
-                  <span className="inline-block bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded text-xs font-mono">
-                    {mismatchData.actualType}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-orange-100 dark:bg-orange-800/50 p-3 rounded-md">
-              <div className="flex items-start space-x-2">
-                <Info className="w-4 h-4 text-orange-700 dark:text-orange-300 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-orange-800 dark:text-orange-200">
-                  <p className="font-medium mb-1">What does this mean?</p>
-                  <p className="mb-2">
-                    Your file has a <span className="font-mono">.{mismatchData.expectedType}</span> extension 
-                    but contains <span className="font-mono">{mismatchData.actualType}</span> content. 
-                    The analysis used the detected format, but this might affect result accuracy.
-                  </p>
-                  <div>
-                    <span className="font-medium">Recommendations:</span>
-                    <ul className="mt-1 space-y-1 list-disc list-inside ml-4">
-                      <li>Rename file with correct extension (.{mismatchData.actualType})</li>
-                      <li>Convert content to match the {mismatchData.expectedType} format</li>
-                      <li>Verify file contents before future uploads</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <button
-          onClick={onDismiss}
-          className="flex-shrink-0 ml-4 p-2 text-orange-500 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-200 hover:bg-orange-100 dark:hover:bg-orange-800 rounded-md transition-colors"
-          title="Dismiss warning"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
-  );
-};
 
 const ResultsPage = () => {
   const [analysisData, setAnalysisData] = useState<StoredAnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Extension mismatch state
-  const [showExtensionMismatch, setShowExtensionMismatch] = useState(false);
-  const [extensionMismatchData, setExtensionMismatchData] = useState<ExtensionMismatchData | null>(null);
   
   const { isConnected } = useAccount();
   const router = useRouter();
@@ -191,7 +89,7 @@ const ResultsPage = () => {
     }
   }, [isConnected, router, mounted]);
 
-  // Load analysis results from sessionStorage with extension mismatch checking
+  // Load analysis results from sessionStorage
   useEffect(() => {
     const loadResults = () => {
       if (!mounted || !isConnected) return;
@@ -210,48 +108,6 @@ const ResultsPage = () => {
         const parsedData: StoredAnalysisData = JSON.parse(storedData);
         console.log('📊 Loaded analysis results:', parsedData);
         setAnalysisData(parsedData);
-        
-        // Check for extension mismatch in stored data
-        if (parsedData.extensionMismatchData?.detected) {
-          setExtensionMismatchData(parsedData.extensionMismatchData);
-          setShowExtensionMismatch(true);
-          
-          // Show toast notification
-          toast(
-            `Extension mismatch: Expected .${parsedData.extensionMismatchData.expectedType} but found ${parsedData.extensionMismatchData.actualType} content`,
-            {
-              duration: 8000,
-              icon: '⚠️',
-              style: {
-                background: '#FEF3C7',
-                color: '#92400E',
-                border: '1px solid #F59E0B'
-              }
-            }
-          );
-        } else if (parsedData.results.metadata.extensionMismatch) {
-          // Fallback: check metadata directly
-          const mismatchData = {
-            detected: true,
-            expectedType: parsedData.results.metadata.expectedFileType || 'unknown',
-            actualType: parsedData.results.metadata.actualContentType || 'unknown',
-            filename: parsedData.results.metadata.fileName
-          };
-          
-          setExtensionMismatchData(mismatchData);
-          setShowExtensionMismatch(true);
-          
-          toast('File format mismatch detected', {
-            duration: 6000,
-            icon: '⚠️',
-            style: {
-              background: '#FEF3C7',
-              color: '#92400E',
-              border: '1px solid #F59E0B'
-            }
-          });
-        }
-        
         setLoading(false);
         
       } catch (error) {
@@ -290,6 +146,8 @@ const ResultsPage = () => {
     };
     return colors[type] || colors.info;
   };
+
+  
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -343,13 +201,6 @@ const ResultsPage = () => {
                 <p>Columns: ${results.metadata.columns}</p>
                 <p>Analysis ID: ${analysisData.analysisId}</p>
                 <p>Processing Time: ${results.metadata.processingTime}</p>
-                ${extensionMismatchData?.detected ? `
-                  <div class="highlight">
-                    <h3>Extension Mismatch Warning</h3>
-                    <p>Expected: .${extensionMismatchData.expectedType}</p>
-                    <p>Detected: ${extensionMismatchData.actualType}</p>
-                  </div>
-                ` : ''}
               </div>
 
               <div class="section">
@@ -443,12 +294,6 @@ const ResultsPage = () => {
             ['Columns', results.metadata.columns],
             ['Analysis ID', analysisData.analysisId],
             ['Processing Time', results.metadata.processingTime],
-            ...(extensionMismatchData?.detected ? [
-              [''],
-              ['Extension Mismatch Warning'],
-              ['Expected Type', extensionMismatchData.expectedType],
-              ['Detected Type', extensionMismatchData.actualType]
-            ] : []),
             [''],
             ['Quality Metrics'],
             ['Metric', 'Score'],
@@ -512,8 +357,7 @@ const ResultsPage = () => {
             metadata: {
               ...results.metadata,
               analysisId: analysisData.analysisId,
-              timestamp: analysisData.timestamp,
-              extensionMismatch: extensionMismatchData
+              timestamp: analysisData.timestamp
             },
             analysis: {
               qualityScore: results.qualityScore,
@@ -644,23 +488,12 @@ const ResultsPage = () => {
                   </>
                 )}
               </div>
+              
+              
             </div>
           </div>
         </div>
       </div>
-
-      {/* Extension Mismatch Warning Banner */}
-      {showExtensionMismatch && extensionMismatchData && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-          <ExtensionMismatchBanner
-            mismatchData={extensionMismatchData}
-            onDismiss={() => {
-              setShowExtensionMismatch(false);
-              toast.success('Warning dismissed');
-            }}
-          />
-        </div>
-      )}
 
       {/* Results Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -794,37 +627,24 @@ const ResultsPage = () => {
         {/* AI Insights */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">AI-Generated Insights</h3>
-          <div className="grid gap-4">
+                  <div className="grid gap-4">
             {results.insights.map((insight, index) => {
-              const Icon = getInsightIcon(insight.type);
-              return (
-                <div key={index} className={`p-4 rounded-lg border ${getInsightColor(insight.type)}`}>
-                  <div className="flex items-start space-x-3">
-                    <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="font-semibold mb-1">{insight.title}</h4>
-                      <p className="text-sm mb-2">{insight.description}</p>
-                      <p className="text-sm font-medium">Action: {insight.action}</p>
-                    </div>
+                      const Icon = getInsightIcon(insight.type);
+                      return (
+                        <div key={index} className={`p-4 rounded-lg border ${getInsightColor(insight.type)}`}>
+                          <div className="flex items-start space-x-3">
+                            <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <h4 className="font-semibold mb-1">{insight.title}</h4>
+                              <p className="text-sm mb-2">{insight.description}</p>
+                              <p className="text-sm font-medium">Action: {insight.action}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
-            
-            {/* Extension Mismatch Insight */}
-            {extensionMismatchData?.detected && (
-              <div className="bg-orange-50 dark:bg-orange-900/30 border-l-4 border-orange-400 p-4 rounded-r-lg">
-                <div className="flex items-center space-x-2 mb-2">
-                  <FileX className="w-5 h-5 text-orange-600" />
-                  <h4 className="font-semibold text-orange-900 dark:text-orange-100">File Format Issue</h4>
-                </div>
-                <p className="text-sm text-orange-800 dark:text-orange-200">
-                  File extension mismatch was detected and handled during analysis. Consider renaming the file with the correct extension.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Blockchain Verification */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
@@ -832,11 +652,44 @@ const ResultsPage = () => {
           <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border border-green-200 dark:border-green-800 mb-6">
             <div className="flex items-center space-x-3">
               <CheckCircle className="w-6 h-6 text-green-600" />
-              <div>
+                <div>
                 <h4 className="font-semibold text-green-900 dark:text-green-100">Analysis Verified</h4>
                 <p className="text-green-700 dark:text-green-300 text-sm">Results stored on Filecoin with cryptographic proof</p>
-              </div>
-            </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+            {/* <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">IPFS Hash</h4>
+              <div className="flex items-center space-x-2">
+                <code className="flex-1 text-sm bg-white dark:bg-gray-800 p-2 rounded font-mono break-all text-gray-700 dark:text-gray-300">
+                  {results.metadata.ipfsHash}
+                            </code>
+                            <button 
+                  onClick={() => copyToClipboard(results.metadata.ipfsHash)}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex-shrink-0"
+                  title="Copy IPFS hash"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          </div>
+            </div> */}
+            
+            {/* <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Smart Contract</h4>
+              <div className="flex items-center space-x-2">
+                <code className="flex-1 text-sm bg-white dark:bg-gray-800 p-2 rounded font-mono text-gray-700 dark:text-gray-300">
+                  {results.metadata.contractAddress}
+                            </code>
+                            <button 
+                  onClick={() => copyToClipboard(results.metadata.contractAddress)}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          </div>
+            </div> */}
           </div>
           
           {/* Analysis Metadata */}
@@ -844,17 +697,17 @@ const ResultsPage = () => {
             <div className="text-center">
               <div className="text-lg font-bold text-gray-900 dark:text-white">Analysis ID: {analysisData.analysisId}</div>
               <div className="text-sm text-gray-500 dark:text-gray-400">Unique identifier</div>
-            </div>
+                        </div>
             <div className="text-center">
               <div className="text-lg font-bold text-gray-900 dark:text-white">{formatFileSize(analysisData.fileSize)}</div>
               <div className="text-sm text-gray-500 dark:text-gray-400">Original file size</div>
-            </div>
+                        </div>
             <div className="text-center">
               <div className="text-lg font-bold text-gray-900 dark:text-white">{results.metadata.processingTime}</div>
               <div className="text-sm text-gray-500 dark:text-gray-400">Processing time</div>
-            </div>
-          </div>
-        </div>
+                      </div>
+                    </div>
+                  </div>
 
         {/* Bias Analysis Details */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 mb-8">
@@ -867,13 +720,13 @@ const ResultsPage = () => {
                 <span className={`px-2 py-1 rounded text-sm font-medium ${getScoreColor(Math.round((1 - results.biasMetrics.geographic.score) * 100))}`}>
                   {Math.round((1 - results.biasMetrics.geographic.score) * 100)}%
                 </span>
-              </div>
+                        </div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-gray-600 dark:text-gray-300">Status</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">{results.biasMetrics.geographic.status}</span>
-              </div>
+                        </div>
               <p className="text-sm text-gray-600 dark:text-gray-300">{results.biasMetrics.geographic.description}</p>
-            </div>
+                      </div>
 
             <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
               <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Demographic Bias</h4>
@@ -882,14 +735,14 @@ const ResultsPage = () => {
                 <span className={`px-2 py-1 rounded text-sm font-medium ${getScoreColor(Math.round((1 - results.biasMetrics.demographic.score) * 100))}`}>
                   {Math.round((1 - results.biasMetrics.demographic.score) * 100)}%
                 </span>
-              </div>
+                        </div>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-gray-600 dark:text-gray-300">Status</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">{results.biasMetrics.demographic.status}</span>
-              </div>
+                        </div>
               <p className="text-sm text-gray-600 dark:text-gray-300">{results.biasMetrics.demographic.description}</p>
-            </div>
-          </div>
+                        </div>
+                      </div>
           
           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
             <div className="flex items-start space-x-3">
@@ -955,7 +808,12 @@ const ResultsPage = () => {
             </div>
           </div>
         </div>
+
+        
       </div>
+
+      {/* Copy notification */}
+      {/* Copy notification removed - functionality not implemented */}
     </div>
   );
 };
