@@ -15,7 +15,7 @@ const SDKPage = () => {
       setCopiedCode(label);
       toast.success(`${label} copied to clipboard!`);
       setTimeout(() => setCopiedCode(null), 2000);
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy code');
     }
   };
@@ -471,7 +471,7 @@ datasets.forEach(dataset => {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-8">
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Complete Example</h3>
               <p className="text-gray-600 dark:text-gray-300 mb-6">
-                Here's a complete working example that you can copy and paste into your project:
+                Here&apos;s a complete working example that you can copy and paste into your project:
               </p>
               <CodeBlock
                 code={`<!DOCTYPE html>

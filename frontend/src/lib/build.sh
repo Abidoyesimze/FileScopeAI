@@ -19,6 +19,7 @@ cp filescope_python_sdk.py dist/
 cp setup.py dist/
 cp requirements.txt dist/
 cp README.md dist/
+cp package.json dist/
 
 # Create __init__.py for Python package
 echo "📁 Creating Python package structure..."

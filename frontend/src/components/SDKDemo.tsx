@@ -34,7 +34,7 @@ const SDKDemo: React.FC = () => {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
 
   // Using the React hook
-  const { analyzeFile, isAnalyzing: hookAnalyzing, results: hookResults, error: hookError, progress } = useFileScopeAnalysis(apiKey, {
+  const { analyzeFile, isAnalyzing: hookAnalyzing, progress } = useFileScopeAnalysis(apiKey, {
     onSuccess: (results) => {
       console.log('Analysis completed successfully:', results);
       setResults(results as DemoResults);
@@ -67,7 +67,7 @@ const SDKDemo: React.FC = () => {
         analysisType: 'comprehensive',
         includeInsights: true
       });
-    } catch (err) {
+    } catch {
       // Error is handled by the hook's onError callback
     }
   };

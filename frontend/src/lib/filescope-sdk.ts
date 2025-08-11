@@ -1,3 +1,5 @@
+import { useState, useCallback, useMemo } from 'react';
+
 /**
  * FileScope AI SDK
  * Simple SDK for integrating FileScope AI analysis into your applications
@@ -69,7 +71,7 @@ export class FileScopeSDK {
     this.baseUrl = baseUrl;
   }
 
-  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
+  private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<unknown> {
     const url = `${this.baseUrl}${endpoint}`;
     const response = await fetch(url, {
       ...options,
@@ -116,11 +118,11 @@ export class FileScopeSDK {
   }
 
   async getResults(analysisId: string): Promise<AnalysisResult> {
-    return this.makeRequest(`/results/${analysisId}`);
+    return this.makeRequest(`/results/${analysisId}`) as Promise<AnalysisResult>;
   }
 
   async getPublicDatasets(): Promise<PublicDataset[]> {
-    return this.makeRequest('/datasets/public');
+    return this.makeRequest('/datasets/public') as Promise<PublicDataset[]>;
   }
 
   async downloadReport(analysisId: string): Promise<Blob> {
@@ -139,7 +141,7 @@ export class FileScopeSDK {
   }
 
   async getAnalysisStatus(analysisId: string): Promise<{ status: string; progress?: number }> {
-    return this.makeRequest(`/status/${analysisId}`);
+    return this.makeRequest(`/status/${analysisId}`) as Promise<{ status: string; progress?: number }>;
   }
 
   async cancelAnalysis(analysisId: string): Promise<void> {
@@ -208,7 +210,4 @@ export function useFileScopeAnalysis(apiKey: string, options?: {
     reset,
     sdk,
   };
-}
-
-// Import React hooks
-import React, { useState, useCallback, useMemo } from 'react'; 
+} 
