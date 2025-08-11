@@ -69,6 +69,44 @@ export interface UploadResponse {
     block_number: string;
     is_public: boolean;
   };
+  // New enhanced API response fields
+  dataset_info?: {
+    original_filename: string;
+    rows: number;
+    columns: number;
+    size_bytes: number;
+    file_type: string;
+    actual_content_type: string;
+    extension_mismatch: boolean;
+    column_names: string[];
+    column_types: Record<string, string>;
+    memory_usage_mb: number;
+    has_missing_values: boolean;
+    missing_percentage: number;
+  };
+  file_health?: {
+    structure_score: number;
+    issues_detected: number;
+    format_mismatch: boolean;
+    can_analyze: boolean;
+  };
+  file_structure_analysis?: {
+    issues_found: number;
+    extension_mismatch: boolean;
+    actual_content_type: string;
+    issues_by_severity: {
+      high: number;
+      medium: number;
+      low: number;
+      info: number;
+    };
+    detailed_issues: Array<{
+      type: string;
+      severity: string;
+      message: string;
+      recommendation: string;
+    }>;
+  };
 }
 
 export interface AnalysisStatus {
@@ -145,6 +183,44 @@ export interface FrontendAnalysisResult {
     description: string;
     action: string;
   }>;
+  // New enhanced API response fields
+  dataset_info?: {
+    original_filename: string;
+    rows: number;
+    columns: number;
+    size_bytes: number;
+    file_type: string;
+    actual_content_type: string;
+    extension_mismatch: boolean;
+    column_names: string[];
+    column_types: Record<string, string>;
+    memory_usage_mb: number;
+    has_missing_values: boolean;
+    missing_percentage: number;
+  };
+  file_health?: {
+    structure_score: number;
+    issues_detected: number;
+    format_mismatch: boolean;
+    can_analyze: boolean;
+  };
+  file_structure_analysis?: {
+    issues_found: number;
+    extension_mismatch: boolean;
+    actual_content_type: string;
+    issues_by_severity: {
+      high: number;
+      medium: number;
+      low: number;
+      info: number;
+    };
+    detailed_issues: Array<{
+      type: string;
+      severity: string;
+      message: string;
+      recommendation: string;
+    }>;
+  };
 }
 
 class AnalysisAPIService {
@@ -572,6 +648,16 @@ class AnalysisAPIService {
       action: 'Review the quality scores and metrics above for detailed insights.'
     }];
     
+    // Extract new enhanced API response fields
+    const dataset_info = backendResult.dataset_info;
+    const file_health = backendResult.file_health;
+    const file_structure_analysis = backendResult.file_structure_analysis;
+    
+    console.log('🔍 New API Response Fields:');
+    console.log('- dataset_info:', dataset_info);
+    console.log('- file_health:', file_health);
+    console.log('- file_structure_analysis:', file_structure_analysis);
+    
     return {
       metadata: {
         fileName: metadata.file_name || 'dataset.csv',
@@ -597,22 +683,18 @@ class AnalysisAPIService {
         high: 0,
         medium: 0,
         low: 0,
-        details: [],
+        details: []
       },
       biasMetrics: metrics.bias_metrics || {
         overall: 0.15,
-        geographic: { 
-          score: 0.1, 
-          status: 'Low', 
-          description: 'Minimal geographic bias detected' 
-        },
-        demographic: { 
-          score: 0.2, 
-          status: 'Low', 
-          description: 'Some demographic skew present' 
-        }
+        geographic: { score: 0.1, status: 'Low', description: 'Minimal geographic bias detected' },
+        demographic: { score: 0.2, status: 'Low', description: 'Some demographic skew present' }
       },
       insights: insights,
+      // Include new enhanced API response fields
+      dataset_info: dataset_info,
+      file_health: file_health,
+      file_structure_analysis: file_structure_analysis
     };
   }
 
