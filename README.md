@@ -432,8 +432,7 @@ Parameters:
 ## 🔗 Demo & Links
 
 - **Live Demo**: [https://filescope-ai.vercel.app](https://filescope-ai.vercel.app)
-- **API Playground**: [https://api.filescope-ai.com/docs](https://api.filescope-ai.com/docs)
-- **Dataset Explorer**: [https://explorer.filescope-ai.com](https://explorer.filescope-ai.com)
+- **Dataset Explorer**: [https://file-scope-ai.vercel.app/explorer]
 
 ---
 
@@ -443,25 +442,17 @@ Parameters:
 - ✅ Core AI analysis engine
 - ✅ Basic Filecoin integration
 - ✅ Web interface
+- ✅ API monetization for enterprise users
+
 
 ### Phase 2 (Next 3 months)
 - 🔄 Advanced ML models for domain-specific analysis
 - 🔄 Real-time collaboration features
-- 🔄 API monetization for enterprise users
 
 ### Phase 3 (6 months)
 - 📋 Federated learning across datasets
 - 📋 DAO governance for platform development
 - 📋 Mobile app with AR data visualization
-
----
-
-## 👥 Team
-
-- **Data Science Lead**: AI algorithm development and statistical analysis
-- **Blockchain Developer**: Filecoin integration and smart contracts  
-- **Full-Stack Developer**: Platform architecture and user experience
-- **UI/UX Designer**: Interface design and user research
 
 ---
 

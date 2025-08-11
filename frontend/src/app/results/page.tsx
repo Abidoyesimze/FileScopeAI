@@ -876,7 +876,36 @@ const ResultsPage = () => {
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
+            {/* <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">IPFS Hash</h4>
+              <div className="flex items-center space-x-2">
+                <code className="flex-1 text-sm bg-white dark:bg-gray-800 p-2 rounded font-mono break-all text-gray-700 dark:text-gray-300">
+                  {results.metadata.ipfsHash}
+                            </code>
+                            <button 
+                  onClick={() => copyToClipboard(results.metadata.ipfsHash)}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex-shrink-0"
+                  title="Copy IPFS hash"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          </div>
+            </div> */}
             
+            {/* <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Smart Contract</h4>
+              <div className="flex items-center space-x-2">
+                <code className="flex-1 text-sm bg-white dark:bg-gray-800 p-2 rounded font-mono text-gray-700 dark:text-gray-300">
+                  {results.metadata.contractAddress}
+                            </code>
+                            <button 
+                  onClick={() => copyToClipboard(results.metadata.contractAddress)}
+                  className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          </div>
+            </div> */}
           </div>
           
           {/* Analysis Metadata */}
@@ -999,7 +1028,8 @@ const ResultsPage = () => {
         
       </div>
 
-      
+      {/* Copy notification */}
+      {/* Copy notification removed - functionality not implemented */}
     </div>
   );
 };
