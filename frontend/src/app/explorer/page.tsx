@@ -195,8 +195,8 @@ const DatasetExplorer = () => {
             // Create dataset object
             const dataset: Dataset = {
               id: i + 1, // Use index as ID for now
-              title: ipfsData?.name || ipfsData?.originalFile?.name || ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`, // Use actual filename if available
-              description: ipfsData?.description || ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || `AI-analyzed dataset`, // Remove fake quality score
+              title: ipfsData?.name || ipfsData?.originalFile?.name || ipfsData?.metadata?.fileName || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
+              description: ipfsData?.description || ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || `AI-analyzed dataset`,
               category: detectCategory(
                 ipfsData?.name || ipfsData?.originalFile?.name || ipfsData?.metadata?.fileName || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
                 ipfsData?.description || ipfsData?.metadata?.description || ipfsData?.results?.metadata?.description || '',
@@ -204,7 +204,11 @@ const DatasetExplorer = () => {
               ),
               metadata: {
                 fileName: ipfsData?.name || ipfsData?.originalFile?.name || ipfsData?.metadata?.fileName || ipfsData?.metadata?.file_name || ipfsData?.results?.metadata?.fileName || `Dataset ${i + 1}`,
-                fileSize: ipfsData?.originalFile?.size ? `${(ipfsData.originalFile.size / 1024).toFixed(2)} KB` : ipfsData?.metadata?.fileSize || ipfsData?.metadata?.file_size || ipfsData?.results?.metadata?.fileSize || 'Unknown',
+                fileSize: ipfsData?.originalFile?.size ? `${(ipfsData.originalFile.size / 1024).toFixed(2)} KB` : 
+                  extractFromAttributes(ipfsData?.attributes, 'File Size') || 
+                  ipfsData?.metadata?.fileSize || 
+                  ipfsData?.metadata?.file_size || 
+                  ipfsData?.results?.metadata?.fileSize || 'Unknown',
                 rows: ipfsData?.results?.metadata?.rows || ipfsData?.metadata?.rows || 0,
                 columns: ipfsData?.results?.metadata?.columns || ipfsData?.metadata?.columns || 0,
                 uploadDate: new Date(Number(contractData.timestamp) * 1000).toISOString(),
@@ -218,17 +222,19 @@ const DatasetExplorer = () => {
               },
               results: {
                 metrics: {
-                  quality_score: ipfsData?.analysis?.qualityScore || ipfsData?.results?.qualityScore?.overall || ipfsData?.results?.metrics?.quality_score || ipfsData?.metrics?.quality_score || 0, // Only use real data
-                  completeness: ipfsData?.analysis?.completeness || ipfsData?.results?.qualityScore?.completeness || ipfsData?.results?.metrics?.completeness || ipfsData?.metrics?.completeness || 0, // Only use real data
+                  quality_score: ipfsData?.analysis?.qualityScore || ipfsData?.results?.qualityScore?.overall || ipfsData?.results?.metrics?.quality_score || ipfsData?.metrics?.quality_score || 
+                    extractFromAttributes(ipfsData?.attributes, 'Quality Score') || 0,
+                  completeness: ipfsData?.analysis?.completeness || ipfsData?.results?.qualityScore?.completeness || ipfsData?.results?.metrics?.completeness || ipfsData?.metrics?.completeness || 0,
                   consistency: ipfsData?.analysis?.consistency || ipfsData?.results?.qualityScore?.consistency || ipfsData?.results?.metrics?.consistency || ipfsData?.metrics?.consistency || 0,
                   accuracy: ipfsData?.analysis?.accuracy || ipfsData?.results?.qualityScore?.accuracy || ipfsData?.results?.metrics?.accuracy || ipfsData?.metrics?.accuracy || 0,
                   validity: ipfsData?.analysis?.validity || ipfsData?.results?.qualityScore?.validity || ipfsData?.results?.metrics?.validity || ipfsData?.metrics?.validity || 0,
                   anomalies: ipfsData?.results?.anomalies || ipfsData?.results?.metrics?.anomalies || ipfsData?.metrics?.anomalies || {
-                    total: ipfsData?.analysis?.anomalies || 0,
-                    high: 0,
-                    medium: 0,
-                    low: 0,
-                    details: []
+                    total: ipfsData?.analysis?.anomalies || 
+                      extractFromAttributes(ipfsData?.attributes, 'Anomalies Found') || 0,
+                    high: ipfsData?.results?.anomalies?.high || 0,
+                    medium: ipfsData?.results?.anomalies?.medium || 0,
+                    low: ipfsData?.results?.anomalies?.low || 0,
+                    details: ipfsData?.results?.anomalies?.details || []
                   },
                   bias_metrics: ipfsData?.results?.biasMetrics || ipfsData?.results?.metrics?.bias_metrics || ipfsData?.metrics?.bias_metrics || {
                     overall: 0,
@@ -253,6 +259,18 @@ const DatasetExplorer = () => {
                 verified: true
               }
             };
+            
+            // Debug: Log what data was extracted
+            console.log(`🔍 Dataset ${i + 1} data extracted:`, {
+              title: dataset.title,
+              quality_score: dataset.results.metrics.quality_score,
+              anomalies_total: dataset.results.metrics.anomalies.total,
+              has_attributes: !!ipfsData?.attributes,
+              attributes_count: ipfsData?.attributes?.length || 0,
+              file_size: dataset.metadata.fileSize,
+              rows: dataset.metadata.rows,
+              columns: dataset.metadata.columns
+            });
             
             processedDatasets.push(dataset);
             
@@ -331,8 +349,14 @@ const DatasetExplorer = () => {
     fetchPublicDatasets();
   }, [mounted, isConnected, contractDatasets, contractError]);
 
+  // Helper function to extract data from attributes
+  const extractFromAttributes = (attributes: any[], traitType: string): any => {
+    if (!attributes || !Array.isArray(attributes)) return null;
+    const attr = attributes.find((a: any) => a.trait_type === traitType);
+    return attr ? attr.value : null;
+  };
+
   // Helper function to fetch IPFS data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fetchIPFSData = async (cid: string): Promise<any> => {
     try {
       console.log('🔍 Fetching IPFS data from CID:', cid);
