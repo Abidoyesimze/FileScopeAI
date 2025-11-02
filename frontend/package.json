@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@lighthouse-web3/sdk": "^0.4.0",
-    "@rainbow-me/rainbowkit": "^2.2.8",
+    "@reown/appkit": "^1.8.12",
+    "@reown/appkit-adapter-wagmi": "^1.8.12",
     "@tanstack/react-query": "^5.84.1",
     "dotenv": "^17.2.1",
     "html2canvas": "^1.4.1",
@@ -23,7 +24,7 @@
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.5.2",
     "viem": "^2.33.2",
-    "wagmi": "^2.16.1"
+    "wagmi": "^2.19.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
